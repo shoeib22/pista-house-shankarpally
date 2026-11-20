@@ -1,5 +1,15 @@
 # Build status · 20 November 2026
 
+## TestFlight preparation · 20 November 2026
+
+- Source: https://github.com/shoeib22/pista-house-shankarpally (master).
+- Three app-specific Codemagic workflows use the existing Apple distribution setup.
+- All three bundle IDs and App Store Connect app records are registered; numeric IDs are in `release/testflight-apps.json`.
+- Three new app-specific App Store profiles imported into Codemagic, each matching the existing shared Qube certificate; unrelated app profiles were unchanged.
+- Latest mobile checks: clean Flutter analysis for all three; customer 3 ordinary + 3 beta tests, delivery 4, owner 5 (15 pass). Signing selector tests: 3 pass.
+- First customer CI run passed analysis, tests and signing verification, then stopped on an empty Apple build history. Fixed the first-upload numbering to use the Codemagic project counter. Corrected customer, delivery and owner runs finished successfully. Customer version 0.1.0 build 4 uploaded and was verified Ready to Test in App Store Connect. Delivery version 0.1.0 build 5 uploaded successfully; its last observed Apple state was Processing. Owner upload log also confirms no errors uploading the signed IPA. Delivery and owner final TestFlight compliance/testing states have not been verified. No tester invitations were sent.
+- Backend server recovery is deferred at the user's request. Beta builds can configure the isolated HTTPS endpoint after installation. The earlier backend test/audit checkpoint below predates the beta server changes and dependency additions; new database-backed beta tests have not completed.
+
 ## Current result
 
 The local build connects customer, employee, owner and rider workflows on one NestJS/PostgreSQL backend. Version 0.3 adds credential-backed operational accounts, owner invitations/recovery, account suspension, passphrase changes and session revocation. Pickup/delivery, kitchen updates and code-verified delivery remain working.
@@ -80,3 +90,4 @@ Debug APKs:
 - `apps/customer_app/build/app/outputs/flutter-apk/app-debug.apk`
 - `apps/owner_app/build/app/outputs/flutter-apk/app-debug.apk`
 - `apps/delivery_app/build/app/outputs/flutter-apk/app-debug.apk`
+
