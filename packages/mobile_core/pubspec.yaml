@@ -1,0 +1,12 @@
+name: pista_core
+description: Shared view models and repositories for the Pista House apps.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: ^3.12.2
+dependencies:
+  flutter:
+    sdk: flutter
+  pista_api:
+    path: ../mobile_api
+  shared_preferences: ^2.5.6

@@ -1,0 +1,145 @@
+definitions:
+  scripts:
+    - &beta-preflight
+      name: Check isolated HTTPS beta API
+      script: node scripts/ci/check-beta-target.mjs
+    - &flutter-checks
+      name: Resolve packages and verify Flutter app
+      script: |
+        set -euo pipefail
+        cd "$APP_DIR"
+        flutter pub get
+        flutter analyze
+        flutter test
+        if [ -f test/beta_mode_test.dart ]; then
+          flutter test --dart-define=BETA_TESTING=true test/beta_mode_test.dart
+        fi
+    - &select-profile
+      name: Verify app-specific Qube distribution profile
+      script: python3 scripts/ci/select-ios-profile.py
+    - &signed-ipa
+      name: Archive signed internal TestFlight beta
+      script: bash scripts/ci/build-ios-beta.sh
+  publishing: &internal-publishing
+    app_store_connect:
+      auth: integration
+      submit_to_testflight: false
+      submit_to_app_store: false
+workflows:
+  pista-customer-testflight:
+    name: Pista Customer - internal TestFlight beta
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: qube_led_wall
+    environment:
+      flutter: 3.44.7
+      xcode: latest
+      cocoapods: default
+      groups:
+        - pista_house_customer
+      vars:
+        APP_ROLE: customer
+        APP_DIR: apps/customer_app
+        BUNDLE_ID: com.pistahouse.shankarpally.pistaCustomer
+      ios_signing:
+        certificates:
+          - Qube iOS Distribution WHOOP shared
+        provisioning_profiles:
+          - pista_customer_app_store
+    scripts:
+      - *beta-preflight
+      - *flutter-checks
+      - *select-profile
+      - *signed-ipa
+    artifacts:
+      - apps/customer_app/build/ios/ipa/*.ipa
+      - apps/customer_app/build/ios/archive/*.xcarchive/dSYMs/**
+      - /tmp/xcodebuild_logs/*.log
+    publishing: *internal-publishing
+  pista-delivery-testflight:
+    name: Pista Delivery - internal TestFlight beta
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: qube_led_wall
+    environment:
+      flutter: 3.44.7
+      xcode: latest
+      cocoapods: default
+      groups:
+        - pista_house_delivery
+      vars:
+        APP_ROLE: delivery
+        APP_DIR: apps/delivery_app
+        BUNDLE_ID: com.pistahouse.shankarpally.pistaDelivery
+      ios_signing:
+        certificates:
+          - Qube iOS Distribution WHOOP shared
+        provisioning_profiles:
+          - pista_delivery_app_store
+    scripts:
+      - *beta-preflight
+      - *flutter-checks
+      - *select-profile
+      - *signed-ipa
+    artifacts:
+      - apps/delivery_app/build/ios/ipa/*.ipa
+      - apps/delivery_app/build/ios/archive/*.xcarchive/dSYMs/**
+      - /tmp/xcodebuild_logs/*.log
+    publishing: *internal-publishing
+  pista-owner-testflight:
+    name: Pista Owner - internal TestFlight beta
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: qube_led_wall
+    environment:
+      flutter: 3.44.7
+      xcode: latest
+      cocoapods: default
+      groups:
+        - pista_house_owner
+      vars:
+        APP_ROLE: owner
+        APP_DIR: apps/owner_app
+        BUNDLE_ID: com.pistahouse.shankarpally.pistaOwner
+      ios_signing:
+        certificates:
+          - Qube iOS Distribution WHOOP shared
+        provisioning_profiles:
+          - pista_owner_app_store
+    scripts:
+      - *beta-preflight
+      - *flutter-checks
+      - *select-profile
+      - *signed-ipa
+    artifacts:
+      - apps/owner_app/build/ios/ipa/*.ipa
+      - apps/owner_app/build/ios/archive/*.xcarchive/dSYMs/**
+      - /tmp/xcodebuild_logs/*.log
+    publishing: *internal-publishing
+  pista-ios-compile:
+    name: Pista - unsigned iOS compile checks
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: 3.44.7
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Verify and compile all three iOS apps without distribution
+        script: |
+          set -euo pipefail
+          mkdir -p build/ios-compile
+          for role in customer delivery owner; do
+            (
+              cd "apps/${role}_app"
+              flutter pub get
+              flutter analyze
+              flutter test
+              flutter build ios --release --no-codesign --dart-define=BETA_TESTING=true
+            ) 2>&1 | tee "build/ios-compile/${role}.log"
+          done
+    artifacts:
+      - build/ios-compile/*.log

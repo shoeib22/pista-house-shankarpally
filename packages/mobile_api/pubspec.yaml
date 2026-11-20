@@ -1,0 +1,8 @@
+name: pista_api
+description: Shared API transport for the Pista House applications.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: ^3.12.2
+dependencies:
+  http: ^1.4.0

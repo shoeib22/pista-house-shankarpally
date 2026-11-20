@@ -1,0 +1,201 @@
+.account-access .login {
+  max-width: 480px;
+}
+.account-access .login label,
+.accounts-page label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 550;
+  margin: 18px 0;
+}
+.account-access .login input,
+.accounts-page input,
+.accounts-page textarea,
+.accounts-page select {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 12px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 1rem;
+  min-height: 44px;
+}
+.account-access .login select {
+  font-size: 1rem;
+}
+.account-access .primary,
+.accounts-page .primary,
+.accounts-page .outline {
+  font-size: 0.875rem;
+  min-height: 44px;
+}
+.account-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 24px 0 18px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+.account-tabs button {
+  padding: 10px 12px;
+  font-size: 0.875rem;
+  border-radius: 5px;
+  min-height: 40px;
+}
+.account-tabs button[aria-pressed="true"] {
+  background: var(--green);
+  color: white;
+}
+.account-help {
+  font-size: 0.875rem;
+  color: var(--muted);
+  line-height: 1.7;
+  margin: 18px 0;
+}
+.account-access .muted {
+  font-size: 1rem;
+}
+.account-access .error {
+  margin-top: 16px;
+  font-size: 0.875rem;
+}
+.accounts-page {
+  max-width: 1000px;
+  font-size: 1rem;
+}
+.accounts-page h3 {
+  font-size: 1.125rem;
+  margin: 24px 0 14px;
+}
+.account-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+.account-heading p {
+  color: var(--muted);
+  line-height: 1.7;
+  margin-top: 10px;
+  font-size: 0.875rem;
+}
+.account-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 180px;
+  gap: 18px;
+}
+.invite-form,
+.password-form,
+.issued-code {
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 22px 0;
+}
+.invite-form h3,
+.password-form h3,
+.issued-code h3 {
+  margin-top: 0;
+}
+.issued-code {
+  border-color: var(--gold);
+}
+.issued-code p {
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: var(--muted);
+  margin: 12px 0;
+}
+.issued-code textarea {
+  font-family: monospace;
+  resize: none;
+  overflow-wrap: anywhere;
+}
+.team-list {
+  margin: 16px 0 26px;
+}
+.team-list article {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+.team-list b {
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+.team-list p {
+  font-size: 0.875rem;
+  line-height: 1.8;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.account-row-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.password-form {
+  max-width: 520px;
+}
+.account-success {
+  padding: 14px;
+  background: #edf3e8;
+  color: var(--green);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+.settings-view .metrics {
+  display: none;
+}
+.accounts-page .error {
+  font-size: 0.875rem;
+}
+@media (max-width: 1000px) {
+  .account-form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .account-form-grid label:last-child {
+    grid-column: 1/-1;
+  }
+}
+@media (max-width: 700px) {
+  .account-form-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .account-form-grid label:last-child {
+    grid-column: auto;
+  }
+  .team-list article {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .account-row-actions {
+    justify-content: flex-start;
+  }
+  .invite-form,
+  .password-form,
+  .issued-code {
+    padding: 18px;
+  }
+  .account-heading {
+    align-items: flex-start;
+  }
+  .account-access .login {
+    padding: 26px;
+  }
+}

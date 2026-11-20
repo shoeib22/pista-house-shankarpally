@@ -1,0 +1,140 @@
+.dispatch-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 22px;
+}
+.dispatch-heading h2 {
+  font-size: 20px;
+}
+.dispatch-heading p {
+  font-size: 12px;
+  margin-top: 8px;
+}
+.dispatch-count {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--green);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.rider-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 24px;
+}
+.rider-strip > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  border-radius: 5px;
+  font-size: 11px;
+}
+.rider-strip small {
+  margin-left: 7px;
+  font-size: 9px;
+}
+.rider-online {
+  color: var(--green);
+}
+.rider-offline {
+  color: var(--muted);
+}
+.dispatch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+}
+.dispatch-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 20px;
+}
+.dispatch-card .items {
+  font-size: 12px;
+}
+.dispatch-address {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--muted);
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.dispatch-address svg {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.assigned-rider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 16px;
+  font-size: 12px;
+  color: var(--green);
+}
+.field-label {
+  display: block;
+  font-size: 11px;
+  margin: 14px 0 8px;
+  color: var(--muted);
+}
+.dispatch-card select {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 10px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+.delivery-exception {
+  display: flex;
+  gap: 8px;
+  background: #faf0e3;
+  color: #975d2e;
+  border: 1px solid #ead7bd;
+  border-radius: 5px;
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 12px 0;
+}
+.delivery-exception svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.delivery-exception small {
+  color: #8d704e;
+  font-size: 10px;
+}
+.tag.exception {
+  background: #f5dfca;
+  color: #965b2d;
+}
+.completed-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 24px;
+}
+@media (max-width: 700px) {
+  .dispatch-heading {
+    display: block;
+  }
+  .dispatch-count {
+    margin-top: 14px;
+  }
+  .dispatch-grid {
+    grid-template-columns: 1fr;
+  }
+}

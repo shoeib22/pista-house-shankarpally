@@ -1,0 +1,14 @@
+name: pista_ui
+description: Shared Pista House brand components and theme.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: ^3.12.2
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_svg: ^2.2.0
+flutter:
+  assets:
+    - assets/logo.svg
+    - assets/biryani-cover.png

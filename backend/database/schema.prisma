@@ -1,0 +1,224 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Outlet {
+  id            String         @id
+  name          String
+  paused        Boolean        @default(false)
+  users         User[]
+  products      Product[]
+  orders        Order[]
+  deliveryZones DeliveryZone[]
+  invitations   Invitation[]
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  outletId            String
+  outlet              Outlet               @relation(fields: [outletId], references: [id])
+  name                String
+  role                String
+  sessions            Session[]
+  orders              Order[]
+  riderAvailable      Boolean              @default(false)
+  assignments         DeliveryAssignment[]
+  disabledAt          DateTime?
+  authVersion         Int                  @default(0)
+  developmentOnly     Boolean              @default(false)
+  credential          Credential?
+  invitationsCreated  Invitation[]         @relation("InvitationIssuer")
+  recoveryInvitations Invitation[]         @relation("InvitationTarget")
+}
+
+model Session {
+  id          String   @id @default(uuid())
+  tokenHash   String   @unique
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  authVersion Int      @default(0)
+  authMethod  String   @default("development")
+}
+
+model Product {
+  id          String  @id
+  outletId    String
+  outlet      Outlet  @relation(fields: [outletId], references: [id])
+  name        String
+  description String
+  category    String
+  pricePaise  Int
+  vegetarian  Boolean
+  available   Boolean @default(true)
+}
+
+model Order {
+  id              String               @id @default(uuid())
+  number          Int                  @unique @default(autoincrement())
+  outletId        String
+  outlet          Outlet               @relation(fields: [outletId], references: [id])
+  customerId      String
+  customer        User                 @relation(fields: [customerId], references: [id])
+  idempotencyKey  String
+  requestHash     String
+  fulfilment      String
+  status          String               @default("awaiting_acceptance")
+  paymentStatus   String               @default("pending")
+  subtotalPaise   Int
+  taxPaise        Int
+  deliveryPaise   Int
+  totalPaise      Int
+  version         Int                  @default(0)
+  createdAt       DateTime             @default(now())
+  items           OrderItem[]
+  events          OrderEvent[]
+  paymentEvents   PaymentEvent[]
+  deliveryAddress Json?
+  assignments     DeliveryAssignment[]
+
+  @@unique([customerId, idempotencyKey])
+  @@index([outletId, status, createdAt])
+}
+
+model OrderItem {
+  id        String @id @default(uuid())
+  orderId   String
+  order     Order  @relation(fields: [orderId], references: [id])
+  productId String
+  name      String
+  quantity  Int
+  unitPaise Int
+}
+
+model OrderEvent {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  actorId   String
+  action    String
+  reason    String?
+  createdAt DateTime @default(now())
+}
+
+model PaymentEvent {
+  id          String   @id
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id])
+  provider    String
+  amountPaise Int
+  createdAt   DateTime @default(now())
+}
+
+model AuditEvent {
+  id         String   @id @default(uuid())
+  outletId   String
+  actorId    String
+  action     String
+  resourceId String
+  detail     String?
+  createdAt  DateTime @default(now())
+
+  @@index([outletId, createdAt])
+}
+
+model OutboxEvent {
+  id          String    @id @default(uuid())
+  outletId    String
+  kind        String
+  resourceId  String
+  payload     Json
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+}
+
+model DeliveryZone {
+  id              String  @id @default(uuid())
+  outletId        String
+  outlet          Outlet  @relation(fields: [outletId], references: [id])
+  postalCode      String
+  name            String
+  deliveryPaise   Int
+  active          Boolean @default(true)
+  approved        Boolean @default(false)
+  developmentOnly Boolean @default(true)
+
+  @@unique([outletId, postalCode])
+}
+
+model DeliveryAssignment {
+  id            String            @id @default(uuid())
+  orderId       String
+  order         Order             @relation(fields: [orderId], references: [id])
+  riderId       String
+  rider         User              @relation(fields: [riderId], references: [id])
+  status        String            @default("assigned")
+  isActive      Boolean           @default(true)
+  version       Int               @default(0)
+  failureReason String?
+  otpHash       String?
+  otpSalt       String?
+  otpExpiresAt  DateTime?
+  otpIssuedAt   DateTime?
+  otpIssueCount Int               @default(0)
+  otpAttempts   Int               @default(0)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  events        AssignmentEvent[]
+
+  @@index([riderId, isActive, createdAt])
+  @@index([orderId, createdAt])
+}
+
+model AssignmentEvent {
+  id           String             @id @default(uuid())
+  assignmentId String
+  assignment   DeliveryAssignment @relation(fields: [assignmentId], references: [id])
+  actorId      String
+  action       String
+  reason       String?
+  createdAt    DateTime           @default(now())
+}
+
+model Credential {
+  userId       String   @id
+  user         User     @relation(fields: [userId], references: [id])
+  handle       String   @unique
+  passwordHash String
+  changedAt    DateTime @default(now())
+}
+
+model Invitation {
+  id              String    @id @default(uuid())
+  outletId        String
+  outlet          Outlet    @relation(fields: [outletId], references: [id])
+  createdById     String
+  createdBy       User      @relation("InvitationIssuer", fields: [createdById], references: [id])
+  userId          String?
+  user            User?     @relation("InvitationTarget", fields: [userId], references: [id])
+  tokenHash       String    @unique
+  handle          String
+  name            String
+  role            String
+  kind            String    @default("create")
+  developmentOnly Boolean   @default(false)
+  expiresAt       DateTime
+  usedAt          DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([outletId, createdAt])
+}
+
+model AuthThrottle {
+  key      String   @id
+  attempts Int
+  resetAt  DateTime
+
+  @@index([resetAt])
+}
