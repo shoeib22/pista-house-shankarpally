@@ -3,8 +3,29 @@
   "integration": "qube_led_wall",
   "certificateReference": "Qube iOS Distribution WHOOP shared",
   "apps": {
-    "customer": { "directory": "apps/customer_app", "bundleId": "com.pistahouse.shankarpally.pistaCustomer", "displayName": "Pista House Shankarpally", "profileReference": "pista_customer_app_store", "environmentGroup": "pista_house_customer", "appStoreId": null },
-    "delivery": { "directory": "apps/delivery_app", "bundleId": "com.pistahouse.shankarpally.pistaDelivery", "displayName": "Pista House Delivery Partner", "profileReference": "pista_delivery_app_store", "environmentGroup": "pista_house_delivery", "appStoreId": null },
-    "owner": { "directory": "apps/owner_app", "bundleId": "com.pistahouse.shankarpally.pistaOwner", "displayName": "Pista House Outlet Owner", "profileReference": "pista_owner_app_store", "environmentGroup": "pista_house_owner", "appStoreId": null }
+    "customer": {
+      "directory": "apps/customer_app",
+      "bundleId": "com.pistahouse.shankarpally.pistaCustomer",
+      "displayName": "Pista House Shankarpally",
+      "profileReference": "pista_customer_app_store",
+      "environmentGroup": "pista_house_customer",
+      "appStoreId": "6837026840"
+    },
+    "delivery": {
+      "directory": "apps/delivery_app",
+      "bundleId": "com.pistahouse.shankarpally.pistaDelivery",
+      "displayName": "Pista House Delivery Partner",
+      "profileReference": "pista_delivery_app_store",
+      "environmentGroup": "pista_house_delivery",
+      "appStoreId": "6837026855"
+    },
+    "owner": {
+      "directory": "apps/owner_app",
+      "bundleId": "com.pistahouse.shankarpally.pistaOwner",
+      "displayName": "Pista House Outlet Owner",
+      "profileReference": "pista_owner_app_store",
+      "environmentGroup": "pista_house_owner",
+      "appStoreId": "6837027321"
+    }
   }
 }

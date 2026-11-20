@@ -36,9 +36,8 @@ workflows:
       flutter: 3.44.7
       xcode: latest
       cocoapods: default
-      groups:
-        - pista_house_customer
       vars:
+        APP_STORE_APPLE_ID: '6837026840'
         APP_ROLE: customer
         APP_DIR: apps/customer_app
         BUNDLE_ID: com.pistahouse.shankarpally.pistaCustomer
@@ -67,9 +66,8 @@ workflows:
       flutter: 3.44.7
       xcode: latest
       cocoapods: default
-      groups:
-        - pista_house_delivery
       vars:
+        APP_STORE_APPLE_ID: '6837026855'
         APP_ROLE: delivery
         APP_DIR: apps/delivery_app
         BUNDLE_ID: com.pistahouse.shankarpally.pistaDelivery
@@ -98,9 +96,8 @@ workflows:
       flutter: 3.44.7
       xcode: latest
       cocoapods: default
-      groups:
-        - pista_house_owner
       vars:
+        APP_STORE_APPLE_ID: '6837027321'
         APP_ROLE: owner
         APP_DIR: apps/owner_app
         BUNDLE_ID: com.pistahouse.shankarpally.pistaOwner
@@ -143,3 +140,4 @@ workflows:
           done
     artifacts:
       - build/ios-compile/*.log
+
