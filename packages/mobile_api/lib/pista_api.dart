@@ -16,7 +16,8 @@ class PistaApi {
   String? token;
 
   /// Display details of the signed-in account, from the last sign-in.
-  String? userName, userHandle;
+  String? userName, userHandle, userEmail;
+  bool emailVerified = false;
   final http.Client _client;
   PistaApi({String? baseUrl, http.Client? client})
     : baseUrl =
@@ -89,14 +90,84 @@ class PistaApi {
 
   /// Customer self-registration with a mobile number and a passphrase. The
   /// number is not verified yet. Signs the new customer in.
-  Future<void> register(String name, String phone, String password) async {
+  Future<void> register(
+    String name,
+    String phone,
+    String password, {
+    String? email,
+  }) async {
     final data = await request(
       '/auth/register',
       method: 'POST',
-      body: {'name': name, 'phone': phone, 'password': password},
+      body: {
+        'name': name,
+        'phone': phone,
+        'password': password,
+        if (email != null && email.isNotEmpty) 'email': email,
+      },
     );
     _remember(data);
+    userEmail = data['email'] == null ? null : '${data['email']}';
+    emailVerified = data['emailVerified'] == true;
+    lastEmailSent = data['emailSent'] == true;
   }
+
+  /// Whether the verification email from the last sign-up was sent.
+  bool lastEmailSent = false;
+
+  /// Refreshes the signed-in account's name, number and email status.
+  Future<void> loadAccount() async {
+    if (token == null) return;
+    final data = await request('/auth/me');
+    userName = '${data['name']}';
+    userHandle = data['handle'] == null ? null : '${data['handle']}';
+    userEmail = data['email'] == null ? null : '${data['email']}';
+    emailVerified = data['emailVerified'] == true;
+  }
+
+  /// Adds or changes the account's email and sends a verification code.
+  /// Returns whether the email was sent.
+  Future<bool> setEmail(String email) async {
+    final data = await request(
+      '/auth/email',
+      method: 'POST',
+      body: {'email': email},
+    );
+    userEmail = '${data['email']}';
+    emailVerified = data['verified'] == true;
+    return data['sent'] == true;
+  }
+
+  Future<bool> resendEmailCode() async {
+    final data = await request('/auth/email/resend', method: 'POST');
+    return data['sent'] == true;
+  }
+
+  Future<void> verifyEmail(String code) async {
+    await request('/auth/email/verify', method: 'POST', body: {'code': code});
+    emailVerified = true;
+  }
+
+  /// Asks for a passphrase reset code. The server answers the same for every
+  /// identifier, so this reveals nothing about who has an account.
+  Future<String> forgotPassphrase(String identifier) async {
+    final data = await request(
+      '/auth/forgot',
+      method: 'POST',
+      body: {'identifier': identifier},
+    );
+    return '${data['message']}';
+  }
+
+  Future<void> resetPassphrase(
+    String identifier,
+    String code,
+    String password,
+  ) => request(
+    '/auth/reset',
+    method: 'POST',
+    body: {'identifier': identifier, 'code': code, 'password': password},
+  );
 
   void _remember(dynamic data) {
     token = data['token'] as String;
@@ -122,7 +193,8 @@ class PistaApi {
       if (token != null) await request('/session', method: 'DELETE');
     } finally {
       token = null;
-      userName = userHandle = null;
+      userName = userHandle = userEmail = null;
+      emailVerified = false;
     }
   }
 

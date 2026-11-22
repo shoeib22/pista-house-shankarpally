@@ -107,7 +107,7 @@ async function newSession(
 @Injectable()
 export class Accounts {
   constructor(@Inject(Database) private db: Database) {}
-  private async throttle(scope: string, ip: string, identity: string) {
+  async throttle(scope: string, ip: string, identity: string) {
     // Never trust caller-supplied forwarding headers. Store only opaque bucket keys.
     const buckets = [
       { key: hash(`${scope}:ip:${ip}`), limit: 30 },
@@ -199,7 +199,7 @@ export class Accounts {
    * where customer password sign-in is, i.e. the private beta.
    */
   async register(body: unknown, ip: string) {
-    const { name, phone, password } = parse(
+    const { name, phone, password, email } = parse(
       z
         .object({
           name: z.string().trim().min(2, "Enter your name").max(60),
@@ -211,6 +211,13 @@ export class Accounts {
               "Enter a valid 10-digit mobile number",
             ),
           password: passwordSchema,
+          email: z
+            .string()
+            .trim()
+            .toLowerCase()
+            .email("Enter a valid email address")
+            .max(120)
+            .optional(),
         })
         .strict(),
       body,
@@ -236,7 +243,7 @@ export class Accounts {
     try {
       return await this.db.$transaction(async (tx) => {
         const user = await tx.user.create({
-          data: { outletId, name, role: "customer" },
+          data: { outletId, name, role: "customer", email: email ?? null },
         });
         await tx.credential.create({
           data: {
@@ -255,7 +262,12 @@ export class Accounts {
             detail: "customer, phone not verified",
           },
         });
-        return { ...session, phoneVerified: false, handle: phone };
+        return {
+          ...session,
+          phoneVerified: false,
+          handle: phone,
+          emailPending: email ?? null,
+        };
       });
     } catch (e) {
       if (

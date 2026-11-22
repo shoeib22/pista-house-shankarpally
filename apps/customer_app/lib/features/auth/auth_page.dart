@@ -1,5 +1,6 @@
 import 'package:pista_ui/pista_ui.dart';
 import 'package:pista_core/pista_core.dart';
+import 'email_pages.dart';
 
 /// Customer sign-in and sign-up. Pops `true` once the customer is signed in.
 ///
@@ -27,15 +28,47 @@ class _CustomerAuthPageState extends State<CustomerAuthPage> {
       password = TextEditingController(),
       name = TextEditingController(),
       phone = TextEditingController(),
+      email = TextEditingController(),
       newPassword = TextEditingController(),
       confirm = TextEditingController();
 
   @override
   void dispose() {
-    for (final c in [handle, password, name, phone, newPassword, confirm]) {
+    for (final c in [
+      handle,
+      password,
+      name,
+      phone,
+      email,
+      newPassword,
+      confirm,
+    ]) {
       c.dispose();
     }
     super.dispose();
+  }
+
+  Future<void> _forgot() async {
+    final used = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ForgotPassphrasePage(
+          api: widget.api,
+          initialIdentifier: handle.text.trim(),
+        ),
+      ),
+    );
+    if (used == null || !mounted) return;
+    setState(() {
+      handle.text = used;
+      password.clear();
+      error = null;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Passphrase changed. Sign in with your new passphrase.'),
+      ),
+    );
   }
 
   Future<void> submit() async {
@@ -51,7 +84,22 @@ class _CustomerAuthPageState extends State<CustomerAuthPage> {
           name.text.trim(),
           phone.text.trim(),
           newPassword.text,
+          email: email.text.trim(),
         );
+        if (mounted &&
+            widget.api.userEmail != null &&
+            !widget.api.emailVerified) {
+          // Ask for the emailed code right away; it can be skipped.
+          await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => VerifyEmailPage(
+                api: widget.api,
+                alreadySent: widget.api.lastEmailSent,
+              ),
+            ),
+          );
+        }
       } else {
         await widget.api.passwordLogin(
           handle.text.trim(),
@@ -151,6 +199,13 @@ class _CustomerAuthPageState extends State<CustomerAuthPage> {
                   ),
                   const SizedBox(height: 14),
                   _passwordField(password, 'Passphrase'),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: busy ? null : _forgot,
+                      child: const Text('Forgot your passphrase?'),
+                    ),
+                  ),
                 ],
               ),
             )
@@ -189,6 +244,26 @@ class _CustomerAuthPageState extends State<CustomerAuthPage> {
                         : 'Enter a valid 10-digit mobile number',
                   ),
                   const SizedBox(height: 14),
+                  TextFormField(
+                    controller: email,
+                    enabled: !busy,
+                    keyboardType: TextInputType.emailAddress,
+                    autocorrect: false,
+                    autofillHints: const [AutofillHints.email],
+                    decoration: const InputDecoration(
+                      labelText: 'Email address',
+                      helperText:
+                          'Used to reset your passphrase. We never send marketing email.',
+                      helperMaxLines: 2,
+                    ),
+                    validator: (v) =>
+                        RegExp(
+                          r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                        ).hasMatch((v ?? '').trim())
+                        ? null
+                        : 'Enter a valid email address',
+                  ),
+                  const SizedBox(height: 14),
                   _passwordField(
                     newPassword,
                     'Choose a passphrase',
@@ -205,7 +280,7 @@ class _CustomerAuthPageState extends State<CustomerAuthPage> {
                         : null,
                   ),
                   const Text(
-                    'Your mobile number is not verified yet in this private beta, and there is no passphrase reset, so keep your passphrase safe. Orders use sample menu data and simulated payments.',
+                    'Your mobile number is not verified in this private beta. We email you a code to verify your email address, which is also how you reset a forgotten passphrase. Orders use sample menu data and simulated payments.',
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.5,

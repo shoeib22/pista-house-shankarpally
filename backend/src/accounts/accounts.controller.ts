@@ -13,15 +13,33 @@ import {
 } from "@nestjs/common";
 import { Request } from "express";
 import { Accounts } from "./accounts";
+import { EmailAccounts } from "./email";
 import { AuthRequest, hash, SessionGuard } from "../auth";
 @Controller("api/auth")
 export class AccountAccessController {
-  constructor(@Inject(Accounts) private accounts: Accounts) {}
+  constructor(
+    @Inject(Accounts) private accounts: Accounts,
+    @Inject(EmailAccounts) private email: EmailAccounts,
+  ) {}
   @Post("login") login(@Body() body: unknown, @Req() req: Request) {
     return this.accounts.login(body, req.ip ?? "unknown");
   }
-  @Post("register") register(@Body() body: unknown, @Req() req: Request) {
-    return this.accounts.register(body, req.ip ?? "unknown");
+  @Post("register") async register(@Body() body: unknown, @Req() req: Request) {
+    const made = await this.accounts.register(body, req.ip ?? "unknown");
+    const { emailPending, ...result } = made;
+    let emailSent: boolean | null = null;
+    if (emailPending) {
+      try {
+        emailSent = await this.email.issue(
+          { id: made.user.id, name: made.user.name },
+          emailPending,
+          "verify",
+        );
+      } catch {
+        emailSent = false; // The account exists; the app offers "send again".
+      }
+    }
+    return { ...result, email: emailPending, emailVerified: false, emailSent };
   }
   @Post("accept-invitation") accept(
     @Body() body: unknown,

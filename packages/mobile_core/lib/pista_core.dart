@@ -36,7 +36,8 @@ class CustomerModel extends ChangeNotifier {
   bool get checkoutLocked => _checkoutKey != null || pendingOrder != null;
   void resetForServer() {
     api.token = null;
-    api.userName = api.userHandle = null;
+    api.userName = api.userHandle = api.userEmail = null;
+    api.emailVerified = false;
     addresses.clear();
     orders = [];
     cart.clear();

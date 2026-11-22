@@ -28,6 +28,12 @@ import {
 import { Orders } from "./orders";
 import { permit } from "./domain";
 import { Addresses, AddressesController } from "./addresses";
+import {
+  EmailAccounts,
+  EmailManagementController,
+  EmailRecoveryController,
+} from "./accounts/email";
+import { Mailer } from "./mailer";
 import { Delivery } from "./delivery";
 import { Dispatch } from "./dispatch";
 import { DeliveryController } from "./delivery.controller";
@@ -249,6 +255,8 @@ class ProtectedController {
     DeliveryController,
     AddressesController,
     AccountAccessController,
+    EmailRecoveryController,
+    EmailManagementController,
     AccountManagementController,
     TrackingController,
     MapsController,
@@ -259,6 +267,8 @@ class ProtectedController {
     Orders,
     Delivery,
     Addresses,
+    Mailer,
+    EmailAccounts,
     Dispatch,
     Accounts,
     Tracking,

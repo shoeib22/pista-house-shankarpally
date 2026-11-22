@@ -38,6 +38,9 @@ model User {
   recoveryInvitations Invitation[]         @relation("InvitationTarget")
   deliveryOffers      DeliveryOffer[]
   savedAddresses      SavedAddress[]
+  email               String?
+  emailVerifiedAt     DateTime?
+  emailCodes          EmailCode[]
 }
 
 model Session {
@@ -274,4 +277,22 @@ model SavedAddress {
   updatedAt  DateTime @updatedAt
 
   @@index([customerId, updatedAt])
+}
+
+/// A short-lived, single-use code emailed to a customer to verify their email
+/// address or to reset a forgotten passphrase. Only an HMAC of the code is stored.
+model EmailCode {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  purpose   String
+  email     String
+  codeHash  String
+  attempts  Int       @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, purpose, createdAt])
+  @@index([createdAt])
 }

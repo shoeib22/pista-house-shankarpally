@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Pista House Shankarpally API",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "description": "Single-outlet pickup, delivery and private beta API. Real menu, payments, phone authentication and service zones require launch configuration. Live GPS is scoped to active rider sharing leases; map selection does not approve a delivery zone."
   },
   "servers": [
@@ -4374,6 +4374,226 @@
           },
           "404": {
             "description": "Address not found"
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "accountSummary",
+        "summary": "The signed-in account's name, handle and email verification status",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account summary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          }
+        }
+      }
+    },
+    "/auth/email": {
+      "post": {
+        "operationId": "setCustomerEmail",
+        "summary": "Add or change the customer's email and send a 6-digit verification code",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "email, verified and sent flags.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "400": {
+            "description": "Invalid email"
+          },
+          "429": {
+            "description": "Wait before asking for another code"
+          },
+          "503": {
+            "description": "Daily email limit reached"
+          }
+        }
+      }
+    },
+    "/auth/email/resend": {
+      "post": {
+        "operationId": "resendEmailCode",
+        "summary": "Send a new verification code (one per minute; older codes stop working)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "verified and sent flags.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "429": {
+            "description": "Wait before asking for another code"
+          }
+        }
+      }
+    },
+    "/auth/email/verify": {
+      "post": {
+        "operationId": "verifyEmail",
+        "summary": "Verify the email with the 6-digit code (single use, 10 minutes, 5 wrong guesses)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "verified:true.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "400": {
+            "description": "Wrong or expired code"
+          },
+          "409": {
+            "description": "Email already verified on another account"
+          }
+        }
+      }
+    },
+    "/auth/forgot": {
+      "post": {
+        "operationId": "forgotPassphrase",
+        "summary": "Request a passphrase reset code by mobile number or email; the answer is the same whether or not an account matches",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Generic confirmation message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts"
+          },
+          "503": {
+            "description": "Not available in this build"
+          }
+        }
+      }
+    },
+    "/auth/reset": {
+      "post": {
+        "operationId": "resetPassphrase",
+        "summary": "Set a new passphrase with the emailed code; signs the account out everywhere",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Wrong or expired code, or weak passphrase"
+          },
+          "429": {
+            "description": "Too many attempts"
           }
         }
       }

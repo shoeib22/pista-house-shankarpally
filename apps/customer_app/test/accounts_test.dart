@@ -8,7 +8,7 @@ import 'package:pista_ui/pista_ui.dart';
 /// A fake server with a customer address book.
 class AccountsApi extends PistaApi {
   final calls = <String>[];
-  Map? registered, lastCheckout, lastAddressBody;
+  Map? registered, lastCheckout, lastAddressBody, lastBody;
   String? registerError;
   List<Map<String, dynamic>> book = [
     {
@@ -54,7 +54,35 @@ class AccountsApi extends PistaApi {
         'user': {'id': 'u1', 'name': (body)['name'], 'role': 'customer'},
         'handle': (body)['phone'],
         'phoneVerified': false,
+        'email': body['email'],
+        'emailVerified': false,
+        'emailSent': true,
       };
+    }
+    if (path == '/auth/email/verify') {
+      lastBody = Map.from(body as Map);
+      if (body['code'] != '123456') {
+        throw ApiException('That code is not right, or it has expired.', 400);
+      }
+      return {'verified': true};
+    }
+    if (path == '/auth/email/resend') return {'verified': false, 'sent': true};
+    if (path == '/auth/email') {
+      return {'email': (body as Map)['email'], 'verified': false, 'sent': true};
+    }
+    if (path == '/auth/forgot') {
+      lastBody = Map.from(body as Map);
+      return {
+        'ok': true,
+        'message': 'If a verified email matches, a reset code is on its way.',
+      };
+    }
+    if (path == '/auth/reset') {
+      lastBody = Map.from(body as Map);
+      if (body['code'] != '123456') {
+        throw ApiException('That code is not right, or it has expired.', 400);
+      }
+      return {'ok': true};
     }
     if (path == '/addresses' && method == 'GET') return book;
     if (path == '/addresses' && method == 'POST') {
@@ -143,7 +171,7 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
     expect(find.text('Create your account'), findsOneWidget);
-    expect(find.textContaining('not verified yet'), findsOneWidget);
+    expect(find.textContaining('not verified in this private beta'), findsOneWidget);
     // Nothing valid yet.
     await tester.ensureVisible(
       find.widgetWithText(FilledButton, 'Create account'),
@@ -152,13 +180,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Enter your name'), findsOneWidget);
     expect(find.text('Enter a valid 10-digit mobile number'), findsOneWidget);
+    expect(find.text('Enter a valid email address'), findsOneWidget);
     expect(find.text('Use at least 12 characters'), findsOneWidget);
     expect(api.registered, isNull, reason: 'invalid forms are never sent');
     final fields = find.byType(TextFormField);
     await tester.enterText(fields.at(0), 'Asha Rao');
     await tester.enterText(fields.at(1), '90000 00001');
-    await tester.enterText(fields.at(2), 'a-long-test-passphrase');
-    await tester.enterText(fields.at(3), 'a-different-passphrase');
+    await tester.enterText(fields.at(2), 'asha@example.test');
+    await tester.enterText(fields.at(3), 'a-long-test-passphrase');
+    await tester.enterText(fields.at(4), 'a-different-passphrase');
     await tester.ensureVisible(
       find.widgetWithText(FilledButton, 'Create account'),
     );
@@ -166,7 +196,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Passphrases do not match'), findsOneWidget);
     expect(api.registered, isNull);
-    await tester.enterText(fields.at(3), 'a-long-test-passphrase');
+    await tester.enterText(fields.at(4), 'a-long-test-passphrase');
     await tester.ensureVisible(
       find.widgetWithText(FilledButton, 'Create account'),
     );
@@ -174,8 +204,26 @@ void main() {
     await tester.pumpAndSettle();
     expect(api.registered?['name'], 'Asha Rao');
     expect(api.registered?['phone'], '90000 00001');
+    expect(api.registered?['email'], 'asha@example.test');
     expect(api.token, 'new-token');
     expect(api.userName, 'Asha Rao');
+    // The emailed code is asked for straight away.
+    expect(find.text('Verify your email'), findsOneWidget);
+    expect(find.textContaining('asha@example.test'), findsWidgets);
+    expect(result, isNull, reason: 'still on the code page');
+    await tester.enterText(find.byType(TextFormField), '000000');
+    await tester.tap(find.widgetWithText(FilledButton, 'Verify email'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('not right'),
+      findsOneWidget,
+      reason: 'a wrong code is explained',
+    );
+    expect(api.emailVerified, isFalse);
+    await tester.enterText(find.byType(TextFormField), '123456');
+    await tester.tap(find.widgetWithText(FilledButton, 'Verify email'));
+    await tester.pumpAndSettle();
+    expect(api.emailVerified, isTrue);
     expect(result, isTrue);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
@@ -200,8 +248,9 @@ void main() {
     final fields = find.byType(TextFormField);
     await tester.enterText(fields.at(0), 'Asha Rao');
     await tester.enterText(fields.at(1), '9000000001');
-    await tester.enterText(fields.at(2), 'a-long-test-passphrase');
+    await tester.enterText(fields.at(2), 'asha@example.test');
     await tester.enterText(fields.at(3), 'a-long-test-passphrase');
+    await tester.enterText(fields.at(4), 'a-long-test-passphrase');
     await tester.ensureVisible(
       find.widgetWithText(FilledButton, 'Create account'),
     );
@@ -371,6 +420,120 @@ void main() {
         await tester.pumpWidget(const SizedBox());
         model.dispose();
       }
+    },
+  );
+
+  testWidgets(
+    'the code page can be skipped and the customer is still signed in',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final api = AccountsApi();
+      bool? result;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: pistaTheme(),
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: FilledButton(
+                onPressed: () async => result = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        CustomerAuthPage(api: api, startOnSignUp: true),
+                  ),
+                ),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      final fields = find.byType(TextFormField);
+      await tester.enterText(fields.at(0), 'Asha Rao');
+      await tester.enterText(fields.at(1), '9000000001');
+      await tester.enterText(fields.at(2), 'asha@example.test');
+      await tester.enterText(fields.at(3), 'a-long-test-passphrase');
+      await tester.enterText(fields.at(4), 'a-long-test-passphrase');
+      await tester.ensureVisible(
+        find.widgetWithText(FilledButton, 'Create account'),
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Create account'));
+      await tester.pumpAndSettle();
+      expect(find.text('Verify your email'), findsOneWidget);
+      expect(
+        find.textContaining('Send a new code in'),
+        findsOneWidget,
+        reason: 'resend waits a minute',
+      );
+      await tester.tap(find.text('Skip for now'));
+      await tester.pumpAndSettle();
+      expect(result, isTrue);
+      expect(api.token, 'new-token');
+      expect(api.emailVerified, isFalse);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
+    'forgotten passphrase: ask for a code, then set a new passphrase',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final api = AccountsApi();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: pistaTheme(),
+          home: CustomerAuthPage(api: api),
+        ),
+      );
+      await tester.enterText(find.byType(TextFormField).first, '90000 00001');
+      await tester.tap(find.text('Forgot your passphrase?'));
+      await tester.pumpAndSettle();
+      expect(find.text('Reset your passphrase'), findsOneWidget);
+      expect(
+        find.widgetWithText(TextFormField, '90000 00001'),
+        findsOneWidget,
+        reason: 'carried over',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Send code'));
+      await tester.pumpAndSettle();
+      expect(api.lastBody?['identifier'], '90000 00001');
+      expect(find.textContaining('reset code is on its way'), findsOneWidget);
+      expect(find.text('Set new passphrase'), findsOneWidget);
+      final fields = find.byType(TextFormField);
+      await tester.enterText(fields.at(1), '123456');
+      await tester.enterText(fields.at(2), 'brand-new-long-passphrase');
+      await tester.enterText(fields.at(3), 'a-mismatched-passphrase');
+      await tester.ensureVisible(
+        find.widgetWithText(FilledButton, 'Set new passphrase'),
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Set new passphrase'));
+      await tester.pumpAndSettle();
+      expect(find.text('Passphrases do not match'), findsOneWidget);
+      expect(api.calls.where((c) => c == 'POST /auth/reset'), isEmpty);
+      await tester.enterText(fields.at(3), 'brand-new-long-passphrase');
+      await tester.ensureVisible(
+        find.widgetWithText(FilledButton, 'Set new passphrase'),
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Set new passphrase'));
+      await tester.pumpAndSettle();
+      expect(api.lastBody, {
+        'identifier': '90000 00001',
+        'code': '123456',
+        'password': 'brand-new-long-passphrase',
+      });
+      // Back on sign-in with the number filled in, and told what happened.
+      expect(find.text('Welcome back'), findsOneWidget);
+      expect(find.textContaining('Passphrase changed'), findsOneWidget);
+      expect(api.token, isNull, reason: 'resetting does not sign in by itself');
+      await tester.pumpWidget(const SizedBox());
     },
   );
 }

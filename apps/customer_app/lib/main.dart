@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'features/checkout/screens/checkout_sheet.dart';
 import 'features/auth/auth_page.dart';
+import 'features/auth/email_pages.dart';
 import 'features/account/saved_addresses_page.dart';
 import 'package:pista_ui/pista_ui.dart';
 import 'package:pista_core/pista_core.dart';
@@ -466,6 +467,37 @@ class _CustomerHomeState extends State<CustomerHome> {
           const SizedBox(height: 12),
           ListTile(
             contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.mail_outline, color: heritageGreen),
+            title: Text(model.api.userEmail ?? 'Add your email'),
+            subtitle: Text(
+              model.api.userEmail == null
+                  ? 'Needed to reset a forgotten passphrase'
+                  : model.api.emailVerified
+                  ? 'Verified'
+                  : 'Not verified. Tap to verify.',
+              style: TextStyle(
+                color: model.api.userEmail != null && !model.api.emailVerified
+                    ? const Color(0xFF956233)
+                    : null,
+              ),
+            ),
+            trailing: model.api.emailVerified
+                ? const Icon(Icons.verified_outlined, color: heritageGreen)
+                : const Icon(Icons.chevron_right),
+            onTap: model.api.emailVerified
+                ? null
+                : () async {
+                    await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => VerifyEmailPage(api: model.api),
+                      ),
+                    );
+                    if (mounted) setState(() {});
+                  },
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.place_outlined, color: heritageGreen),
             title: const Text('Saved addresses'),
             subtitle: const Text('Add, edit or choose a default'),
@@ -512,6 +544,12 @@ class _CustomerHomeState extends State<CustomerHome> {
     if (accepted == true) {
       await model.refresh();
       model.addresses.load(force: true);
+      model.api
+          .loadAccount()
+          .then((_) {
+            if (mounted) setState(() {});
+          })
+          .catchError((_) {});
       return true;
     }
     return false;
