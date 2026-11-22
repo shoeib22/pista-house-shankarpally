@@ -5,3 +5,5 @@ export 'tracking_connection.dart';
 export 'rider_location_page.dart';
 export 'rider_route_page.dart';
 export 'eta_card.dart';
+export 'notifications.dart';
+export 'support_photos.dart';

@@ -408,3 +408,82 @@ model SupportMessage {
 
   @@index([ticketId, createdAt])
 }
+
+/// A phone this user is signed in on, for push delivery (FCM). Notifications are
+/// always stored for the in-app inbox whether or not any device is registered.
+model DeviceToken {
+  id         String    @id @default(uuid())
+  userId     String
+  platform   String
+  app        String
+  token      String    @unique
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  disabledAt DateTime?
+
+  @@index([userId])
+}
+
+model Notification {
+  id         String    @id @default(uuid())
+  userId     String
+  kind       String
+  /// p0 transactional (never limited) | p1 reminders | p2 promotions
+  priority   String
+  title      String
+  body       String
+  data       Json?
+  /// Holdout rows are kept for measuring lift but never shown or sent.
+  visible    Boolean   @default(true)
+  campaign   String?
+  variant    String?
+  sendAt     DateTime?
+  pushStatus String?
+  pushedAt   DateTime?
+  readAt     DateTime?
+  openedAt   DateTime?
+  convertedAt DateTime?
+  dedupeKey  String?   @unique
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([sendAt])
+  @@index([campaign, createdAt])
+}
+
+/// Customers opt in to reminders and offers; they are off by default.
+model NotificationPreference {
+  userId     String   @id
+  promotions Boolean  @default(false)
+  reminders  Boolean  @default(false)
+  quietStart Int      @default(22)
+  quietEnd   Int      @default(8)
+  updatedAt  DateTime @updatedAt
+}
+
+model NotificationCursor {
+  id String   @id
+  at DateTime
+}
+
+/// The customer's current cart (count and total only), for abandoned-cart reminders.
+model CartSnapshot {
+  userId     String   @id
+  itemCount  Int
+  totalPaise Int
+  updatedAt  DateTime @default(now())
+}
+
+model SupportAttachment {
+  id          String   @id @default(uuid())
+  ticketId    String
+  messageId   String
+  contentType String
+  size        Int
+  bytes       Bytes
+  createdAt   DateTime @default(now())
+
+  @@index([ticketId])
+  @@index([messageId])
+  @@index([createdAt])
+}

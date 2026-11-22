@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { SupportDesk } from "./components/SupportDesk";
 import {
   ClipboardList,
   ChefHat,
@@ -18,6 +19,7 @@ import {
   AlertCircle,
   Users,
   UserRound,
+  LifeBuoy,
 } from "lucide-react";
 import { Api, ApiError, Order, Product, Status, Rider } from "@pista/web-api";
 import { DeliveryDesk } from "./components/DeliveryDesk";
@@ -196,6 +198,8 @@ function App() {
           { name: "Shift log", icon: History },
         ]),
   ];
+  if (user?.role === "owner" || user?.role === "counter")
+    nav.push({ name: "Support", icon: LifeBuoy });
   nav.push({ name: "Account", icon: UserRound });
   if (user?.role === "owner") nav.push({ name: "Team", icon: Users });
   const filtered = orders.filter(
@@ -643,6 +647,10 @@ function App() {
           </section>
         )}
         {view === "Team" && user.role === "owner" && <TeamAccess api={api} />}
+        {view === "Support" &&
+          (user.role === "owner" || user.role === "counter") && (
+            <SupportDesk api={api} />
+          )}
         {view === "Account" && (
           <AccountSettings
             api={api}

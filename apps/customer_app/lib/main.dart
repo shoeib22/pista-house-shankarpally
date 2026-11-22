@@ -47,11 +47,55 @@ class _CustomerHomeState extends State<CustomerHome> {
     super.initState();
     model.refresh();
     poll = Timer.periodic(const Duration(seconds: 5), (_) => model.refresh());
+    model.addListener(_cartChanged);
+  }
+
+  Timer? _cartTimer;
+  String _cartSent = '0:0';
+
+  /// Tells the server what is in the cart a little after it stops changing, so
+  /// a forgotten cart can be reminded about (only if the customer opted in).
+  void _cartChanged() {
+    final key = '${model.quantity}:${model.estimate}';
+    if (key == _cartSent || model.api.token == null) return;
+    _cartTimer?.cancel();
+    _cartTimer = Timer(const Duration(seconds: 20), () async {
+      final now = '${model.quantity}:${model.estimate}';
+      if (now == _cartSent || model.api.token == null) return;
+      try {
+        await model.api.request(
+          '/me/cart',
+          method: 'PUT',
+          body: {'itemCount': model.quantity, 'totalPaise': model.estimate},
+        );
+        _cartSent = now;
+      } catch (_) {
+        // Reminders are optional; try again on the next change.
+      }
+    });
+  }
+
+  /// Where a tapped notification should lead.
+  void _openNotification(Map<String, dynamic> n) {
+    final kind = '${n['kind']}';
+    if (kind.startsWith('support')) {
+      Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SupportPage(api: model.api, orders: model.orders),
+        ),
+      );
+    } else if (kind.startsWith('order') || kind.startsWith('refund')) {
+      Navigator.maybePop(context);
+      setState(() => tab = 2);
+    }
   }
 
   @override
   void dispose() {
     poll.cancel();
+    _cartTimer?.cancel();
+    model.removeListener(_cartChanged);
     model.dispose();
     super.dispose();
   }
@@ -95,6 +139,23 @@ class _CustomerHomeState extends State<CustomerHome> {
                 ),
               const Divider(),
               ListTile(
+                leading: const Icon(Icons.notifications_none),
+                title: const Text('Notifications'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => NotificationsPage(
+                        api: model.api,
+                        showSettings: true,
+                        onOpenItem: _openNotification,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.refresh),
                 title: const Text('Refresh menu and orders'),
                 onTap: () {
@@ -136,6 +197,12 @@ class _CustomerHomeState extends State<CustomerHome> {
                 ),
               ),
               actions: [
+                NotificationBell(
+                  api: model.api,
+                  showSettings: true,
+                  color: heritageGreen,
+                  onOpenItem: _openNotification,
+                ),
                 IconButton(
                   tooltip: 'View cart',
                   onPressed: model.quantity == 0 ? null : _checkout,

@@ -16,12 +16,16 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { Actor, AuthRequest, SessionGuard } from "./auth";
 import { Database } from "./database";
 import { customerOnly, permit } from "./domain";
+import { Notifications } from "./notifications/notifications";
+import type { Response } from "express";
 
 export const CATEGORIES = [
   "missing_item",
@@ -54,6 +58,54 @@ const slaMinutes = () => {
 };
 const body = z.string().trim().min(1, "Write a message").max(2000);
 
+export const MAX_PHOTOS = 3;
+export const MAX_PHOTO_BYTES = 800_000;
+const attachmentList = z
+  .array(
+    z
+      .object({
+        contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+        data: z.string().min(16).max(1_200_000),
+      })
+      .strict(),
+  )
+  .max(MAX_PHOTOS)
+  .optional();
+
+/** The first bytes of a real image of this type, so a renamed file is refused. */
+function looksLike(type: string, b: Buffer) {
+  if (type === "image/jpeg")
+    return b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+  if (type === "image/png")
+    return (
+      b.length > 8 &&
+      b
+        .subarray(0, 8)
+        .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    );
+  return (
+    b.length > 12 &&
+    b.subarray(0, 4).toString("latin1") === "RIFF" &&
+    b.subarray(8, 12).toString("latin1") === "WEBP"
+  );
+}
+function decodePhotos(
+  list: { contentType: string; data: string }[] | undefined,
+) {
+  return (list ?? []).map((a) => {
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(a.data))
+      throw new BadRequestException("A photo could not be read");
+    const bytes = Buffer.from(a.data, "base64");
+    if (bytes.length > MAX_PHOTO_BYTES)
+      throw new BadRequestException("Each photo must be under 800 KB");
+    if (!looksLike(a.contentType, bytes))
+      throw new BadRequestException(
+        "Only JPEG, PNG or WebP photos are accepted",
+      );
+    return { contentType: a.contentType, bytes };
+  });
+}
+
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const p = schema.safeParse(value);
   if (!p.success)
@@ -69,7 +121,56 @@ const LIVE = ["open", "pending_customer"];
 export class Support implements OnModuleInit, OnModuleDestroy {
   private log = new Logger("Support");
   private timer?: NodeJS.Timeout;
-  constructor(@Inject(Database) private db: Database) {}
+  constructor(
+    @Inject(Database) private db: Database,
+    @Inject(Notifications) private notify: Notifications,
+  ) {}
+
+  /** Alerts must never make the support action itself fail. */
+  private async alert(task: () => Promise<unknown>) {
+    try {
+      await task();
+    } catch (e) {
+      this.log.warn(`Support alert failed: ${(e as Error).message}`);
+    }
+  }
+
+  private async savePhotos(
+    tx: Prisma.TransactionClient,
+    ticketId: string,
+    messageId: string,
+    photos: { contentType: string; bytes: Buffer }[],
+  ) {
+    for (const p of photos)
+      await tx.supportAttachment.create({
+        data: {
+          ticketId,
+          messageId,
+          contentType: p.contentType,
+          size: p.bytes.length,
+          bytes: new Uint8Array(p.bytes),
+        },
+      });
+  }
+
+  /** Photo metadata by message, for the conversation views. */
+  private async photoMap(ticketId: string) {
+    const rows = await this.db.supportAttachment.findMany({
+      where: { ticketId },
+      select: { id: true, messageId: true, contentType: true, size: true },
+      orderBy: { createdAt: "asc" },
+    });
+    const map = new Map<
+      string,
+      { id: string; contentType: string; size: number }[]
+    >();
+    for (const r of rows)
+      map.set(r.messageId, [
+        ...(map.get(r.messageId) ?? []),
+        { id: r.id, contentType: r.contentType, size: r.size },
+      ]);
+    return map;
+  }
 
   onModuleInit() {
     if (process.env.SUPPORT_SWEEP_DISABLED === "true") return;
@@ -87,6 +188,10 @@ export class Support implements OnModuleInit, OnModuleDestroy {
       const r = await this.db.supportTicket.updateMany({
         where: { status: "resolved", resolvedAt: { lt: cutoff } },
         data: { status: "closed" },
+      });
+      const days = Number(process.env.SUPPORT_ATTACHMENT_DAYS) || 90;
+      await this.db.supportAttachment.deleteMany({
+        where: { createdAt: { lt: new Date(Date.now() - days * 86400000) } },
       });
       return r.count;
     } catch (e) {
@@ -106,10 +211,12 @@ export class Support implements OnModuleInit, OnModuleDestroy {
           category: z.enum(CATEGORIES),
           subject: z.string().trim().min(3).max(100).optional(),
           message: body,
+          attachments: attachmentList,
         })
         .strict(),
       raw,
     );
+    const photos = decodePhotos(input.attachments);
     const now = new Date();
     const [open, recent] = await Promise.all([
       this.db.supportTicket.count({
@@ -154,15 +261,22 @@ export class Support implements OnModuleInit, OnModuleDestroy {
             : LABELS[input.category]),
         lastCustomerMessageAt: now,
         customerReadAt: now,
-        messages: {
-          create: {
-            authorId: actor.id,
-            authorRole: "customer",
-            body: input.message,
-          },
-        },
       },
     });
+    const first = await this.db.$transaction(async (tx) => {
+      const m = await tx.supportMessage.create({
+        data: {
+          ticketId: ticket.id,
+          authorId: actor.id,
+          authorRole: "customer",
+          body: input.message,
+        },
+      });
+      await this.savePhotos(tx, ticket.id, m.id, photos);
+      return m;
+    });
+    void first;
+    await this.alert(() => this.notify.supportCustomerWrote(ticket, true));
     return this.customerView(actor, ticket.id);
   }
 
@@ -209,6 +323,7 @@ export class Support implements OnModuleInit, OnModuleDestroy {
         where: { id },
         data: { customerReadAt: new Date() },
       });
+    const photos = await this.photoMap(id);
     const order = t.orderId
       ? await this.db.order.findUnique({
           where: { id: t.orderId },
@@ -237,6 +352,7 @@ export class Support implements OnModuleInit, OnModuleDestroy {
         id: m.id,
         from: m.authorRole === "customer" ? "you" : "support",
         body: m.body,
+        attachments: photos.get(m.id) ?? [],
         createdAt: m.createdAt.toISOString(),
       })),
     };
@@ -249,7 +365,11 @@ export class Support implements OnModuleInit, OnModuleDestroy {
 
   async reply(actor: Actor, id: string, raw: unknown) {
     customerOnly(actor.role);
-    const { body: text } = parse(z.object({ body }).strict(), raw);
+    const { body: text, attachments } = parse(
+      z.object({ body, attachments: attachmentList }).strict(),
+      raw,
+    );
+    const photos = decodePhotos(attachments);
     const t = await this.db.supportTicket.findFirst({
       where: { id, customerId: actor.id },
     });
@@ -275,7 +395,7 @@ export class Support implements OnModuleInit, OnModuleDestroy {
       throw new HttpException("Slow down a little, then try again.", 429);
     const now = new Date();
     await this.db.$transaction(async (tx) => {
-      await tx.supportMessage.create({
+      const sent = await tx.supportMessage.create({
         data: {
           ticketId: id,
           authorId: actor.id,
@@ -283,6 +403,7 @@ export class Support implements OnModuleInit, OnModuleDestroy {
           body: text,
         },
       });
+      await this.savePhotos(tx, id, sent.id, photos);
       await tx.supportTicket.update({
         where: { id },
         data: {
@@ -303,6 +424,7 @@ export class Support implements OnModuleInit, OnModuleDestroy {
           },
         });
     });
+    await this.alert(() => this.notify.supportCustomerWrote(t, false));
     return this.customerView(actor, id);
   }
 
@@ -355,6 +477,25 @@ export class Support implements OnModuleInit, OnModuleDestroy {
         "This request cannot be rated (not finished, or already rated).",
       );
     return this.customerView(actor, id);
+  }
+
+  /** A photo, only for the customer who sent it (or on their request) and support staff. */
+  async attachment(actor: Actor, id: string) {
+    const a = await this.db.supportAttachment.findUnique({ where: { id } });
+    if (!a) throw new NotFoundException("Photo not found");
+    const t = await this.db.supportTicket.findUnique({
+      where: { id: a.ticketId },
+    });
+    if (!t || t.outletId !== actor.outletId)
+      throw new NotFoundException("Photo not found");
+    if (actor.role === "customer") {
+      const m = await this.db.supportMessage.findUnique({
+        where: { id: a.messageId },
+      });
+      if (t.customerId !== actor.id || m?.internal)
+        throw new NotFoundException("Photo not found");
+    } else permit(actor.role, "support:manage");
+    return a;
   }
 
   // ---- staff ---------------------------------------------------------
@@ -456,6 +597,7 @@ export class Support implements OnModuleInit, OnModuleDestroy {
       },
     });
     if (!t) throw new NotFoundException("Request not found");
+    const photos = await this.photoMap(id);
     const [order, authors, earlier] = await Promise.all([
       t.orderId
         ? this.db.order.findUnique({
@@ -513,6 +655,7 @@ export class Support implements OnModuleInit, OnModuleDestroy {
       messages: t.messages.map((m) => ({
         id: m.id,
         from: m.authorRole,
+        attachments: photos.get(m.id) ?? [],
         author:
           m.authorRole === "staff"
             ? (authors.find((a) => a.id === m.authorId)?.name ?? "Staff")
@@ -534,6 +677,7 @@ export class Support implements OnModuleInit, OnModuleDestroy {
           body,
           internal: z.boolean().optional(),
           status: z.enum(["pending_customer", "resolved"]).optional(),
+          attachments: attachmentList,
         })
         .strict(),
       raw,
@@ -546,9 +690,10 @@ export class Support implements OnModuleInit, OnModuleDestroy {
       throw new ConflictException(
         "This request is closed. Reopen it to reply to the customer.",
       );
+    const photos = decodePhotos(input.attachments);
     const now = new Date();
     await this.db.$transaction(async (tx) => {
-      await tx.supportMessage.create({
+      const sent = await tx.supportMessage.create({
         data: {
           ticketId: id,
           authorId: actor.id,
@@ -557,6 +702,7 @@ export class Support implements OnModuleInit, OnModuleDestroy {
           body: input.body,
         },
       });
+      await this.savePhotos(tx, id, sent.id, photos);
       if (input.internal) return;
       const status = input.status ?? "pending_customer";
       await tx.supportTicket.update({
@@ -579,6 +725,8 @@ export class Support implements OnModuleInit, OnModuleDestroy {
           },
         });
     });
+    if (!input.internal)
+      await this.alert(() => this.notify.supportStaffReplied(t));
     return this.detail(actor, id);
   }
 
@@ -728,6 +876,24 @@ export class Support implements OnModuleInit, OnModuleDestroy {
 @UseGuards(SessionGuard)
 export class SupportController {
   constructor(@Inject(Support) private support: Support) {}
+  @Get("attachments/:id") async attachment(
+    @Req() req: AuthRequest,
+    @Param("id") id: string,
+    @Res() res: Response,
+  ) {
+    const a = await this.support.attachment(req.actor, id);
+    res
+      .status(200)
+      .set({
+        "Content-Type": a.contentType,
+        "Content-Length": String(a.size),
+        "X-Content-Type-Options": "nosniff",
+        "Content-Disposition": "inline",
+        "Cache-Control": "private, max-age=3600",
+        "Content-Security-Policy": "default-src 'none'",
+      })
+      .send(Buffer.from(a.bytes));
+  }
   // customer
   @Post("tickets") create(@Req() req: AuthRequest, @Body() b: unknown) {
     return this.support.create(req.actor, b);

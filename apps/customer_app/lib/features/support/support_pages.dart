@@ -1,4 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart';
+import 'package:pista_tracking/pista_tracking.dart';
 import 'package:pista_ui/pista_ui.dart';
 import 'package:pista_core/pista_core.dart';
 
@@ -41,6 +45,121 @@ String ago(String iso) {
   if (d.inMinutes < 60) return '${d.inMinutes} min ago';
   if (d.inHours < 24) return '${d.inHours} h ago';
   return '${d.inDays} d ago';
+}
+
+const maxSupportPhotos = 3;
+const maxPhotoBytes = 800000;
+
+/// A photo chosen by the customer, ready to send.
+class PickedPhoto {
+  final Uint8List bytes;
+  final String contentType;
+  PickedPhoto(this.bytes, this.contentType);
+  Map<String, String> toJson() => {
+    'contentType': contentType,
+    'data': base64Encode(bytes),
+  };
+}
+
+/// Works out the image type from its first bytes, or null if it is not one the
+/// server accepts (JPEG, PNG or WebP).
+String? sniffImageType(Uint8List b) {
+  if (b.length > 3 && b[0] == 0xff && b[1] == 0xd8 && b[2] == 0xff) {
+    return 'image/jpeg';
+  }
+  if (b.length > 8 &&
+      b[0] == 0x89 &&
+      b[1] == 0x50 &&
+      b[2] == 0x4e &&
+      b[3] == 0x47) {
+    return 'image/png';
+  }
+  if (b.length > 12 &&
+      String.fromCharCodes(b.sublist(0, 4)) == 'RIFF' &&
+      String.fromCharCodes(b.sublist(8, 12)) == 'WEBP') {
+    return 'image/webp';
+  }
+  return null;
+}
+
+/// Opens the gallery. Replaceable in tests.
+typedef PhotoSource = Future<List<PickedPhoto>> Function(int remaining);
+
+Future<List<PickedPhoto>> pickFromDevice(int remaining) async {
+  final files = await ImagePicker().pickMultiImage(
+    maxWidth: 1600,
+    maxHeight: 1600,
+    imageQuality: 80,
+  );
+  final out = <PickedPhoto>[];
+  for (final f in files.take(remaining)) {
+    final bytes = await f.readAsBytes();
+    final type = sniffImageType(bytes);
+    if (type == null) {
+      throw 'Only JPEG, PNG or WebP photos can be attached.';
+    }
+    if (bytes.length > maxPhotoBytes) {
+      throw 'That photo is too large. Pick a smaller one.';
+    }
+    out.add(PickedPhoto(bytes, type));
+  }
+  return out;
+}
+
+/// Thumbnails of the chosen photos with an "Add photo" button.
+class PhotoPicker extends StatelessWidget {
+  final List<PickedPhoto> photos;
+  final bool enabled;
+  final VoidCallback onAdd;
+  final void Function(int index) onRemove;
+  const PhotoPicker({
+    super.key,
+    required this.photos,
+    required this.onAdd,
+    required this.onRemove,
+    this.enabled = true,
+  });
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      for (var i = 0; i < photos.length; i++)
+        Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.memory(
+                photos[i].bytes,
+                width: 64,
+                height: 64,
+                fit: BoxFit.cover,
+              ),
+            ),
+            Positioned(
+              right: 0,
+              top: 0,
+              child: InkWell(
+                key: ValueKey('remove-photo-$i'),
+                onTap: enabled ? () => onRemove(i) : null,
+                child: const CircleAvatar(
+                  radius: 10,
+                  backgroundColor: Colors.black54,
+                  child: Icon(Icons.close, size: 12, color: Colors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
+      if (photos.length < maxSupportPhotos)
+        OutlinedButton.icon(
+          onPressed: enabled ? onAdd : null,
+          icon: const Icon(Icons.add_photo_alternate_outlined),
+          label: Text(photos.isEmpty ? 'Add photos' : 'Add more'),
+        ),
+    ],
+  );
 }
 
 /// Help centre: common answers and the customer's own requests.
@@ -237,11 +356,13 @@ class NewRequestPage extends StatefulWidget {
   final PistaApi api;
   final List<Map<String, dynamic>> orders;
   final Map<String, dynamic>? order;
+  final PhotoSource photoSource;
   const NewRequestPage({
     super.key,
     required this.api,
     this.orders = const [],
     this.order,
+    this.photoSource = pickFromDevice,
   });
   @override
   State<NewRequestPage> createState() => _NewRequestPageState();
@@ -252,6 +373,7 @@ class _NewRequestPageState extends State<NewRequestPage> {
   String? orderId;
   final message = TextEditingController();
   final form = GlobalKey<FormState>();
+  final photos = <PickedPhoto>[];
   bool busy = false;
   String? error;
 
@@ -265,6 +387,20 @@ class _NewRequestPageState extends State<NewRequestPage> {
   void dispose() {
     message.dispose();
     super.dispose();
+  }
+
+  Future<void> addPhotos() async {
+    try {
+      final more = await widget.photoSource(maxSupportPhotos - photos.length);
+      if (mounted) {
+        setState(() {
+          photos.addAll(more.take(maxSupportPhotos - photos.length));
+          error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    }
   }
 
   Future<void> send() async {
@@ -285,6 +421,8 @@ class _NewRequestPageState extends State<NewRequestPage> {
           'category': category,
           if (orderId != null) 'orderId': orderId,
           'message': message.text.trim(),
+          if (photos.isNotEmpty)
+            'attachments': [for (final p in photos) p.toJson()],
         },
       );
       if (mounted) Navigator.pop(context, '${t['id']}');
@@ -379,6 +517,13 @@ class _NewRequestPageState extends State<NewRequestPage> {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Text(error!, style: const TextStyle(color: _red)),
               ),
+            PhotoPicker(
+              photos: photos,
+              enabled: !busy,
+              onAdd: addPhotos,
+              onRemove: (i) => setState(() => photos.removeAt(i)),
+            ),
+            const SizedBox(height: 14),
             FilledButton(
               style: FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(52),
@@ -403,11 +548,13 @@ class TicketPage extends StatefulWidget {
   final PistaApi api;
   final String ticketId;
   final Duration pollEvery;
+  final PhotoSource photoSource;
   const TicketPage({
     super.key,
     required this.api,
     required this.ticketId,
     this.pollEvery = const Duration(seconds: 10),
+    this.photoSource = pickFromDevice,
   });
   @override
   State<TicketPage> createState() => _TicketPageState();
@@ -417,6 +564,7 @@ class _TicketPageState extends State<TicketPage> {
   Map<String, dynamic>? ticket;
   String? error;
   bool sending = false;
+  final replyPhotos = <PickedPhoto>[];
   final text = TextEditingController();
   final scroll = ScrollController();
   Timer? poll;
@@ -483,6 +631,22 @@ class _TicketPageState extends State<TicketPage> {
     await load();
   }
 
+  Future<void> addPhotos() async {
+    try {
+      final more = await widget.photoSource(
+        maxSupportPhotos - replyPhotos.length,
+      );
+      if (mounted) {
+        setState(() {
+          replyPhotos.addAll(more.take(maxSupportPhotos - replyPhotos.length));
+          error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    }
+  }
+
   Future<void> send() async {
     final body = text.text.trim();
     if (body.isEmpty || sending) return;
@@ -490,10 +654,17 @@ class _TicketPageState extends State<TicketPage> {
       () => widget.api.request(
         '/support/tickets/${widget.ticketId}/messages',
         method: 'POST',
-        body: {'body': body},
+        body: {
+          'body': body,
+          if (replyPhotos.isNotEmpty)
+            'attachments': [for (final p in replyPhotos) p.toJson()],
+        },
       ),
     );
-    if (error == null) text.clear();
+    if (error == null) {
+      text.clear();
+      if (mounted) setState(replyPhotos.clear);
+    }
   }
 
   Future<void> rate(int stars) => act(
@@ -656,6 +827,10 @@ class _TicketPageState extends State<TicketPage> {
                 color: mine ? const Color(0xFFFFF1CF) : Colors.black87,
               ),
             ),
+            SupportPhotoRow(
+              api: widget.api,
+              photos: (m['attachments'] as List?) ?? const [],
+            ),
             const SizedBox(height: 4),
             Text(
               ago('${m['createdAt']}'),
@@ -724,31 +899,56 @@ class _TicketPageState extends State<TicketPage> {
           12,
           10 + MediaQuery.viewInsetsOf(context).bottom,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: TextField(
-                controller: text,
-                enabled: !sending,
-                minLines: 1,
-                maxLines: 4,
-                maxLength: 2000,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  hintText: t['status'] == 'resolved'
-                      ? 'Reply to reopen this request'
-                      : 'Write a message',
-                  counterText: '',
+            if (replyPhotos.isNotEmpty)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: PhotoPicker(
+                    photos: replyPhotos,
+                    enabled: !sending,
+                    onAdd: addPhotos,
+                    onRemove: (i) => setState(() => replyPhotos.removeAt(i)),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            IconButton.filled(
-              tooltip: 'Send message',
-              style: IconButton.styleFrom(backgroundColor: _green),
-              onPressed: sending ? null : send,
-              icon: const Icon(Icons.send_rounded),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                IconButton(
+                  tooltip: 'Attach photos',
+                  onPressed: sending || replyPhotos.length >= maxSupportPhotos
+                      ? null
+                      : addPhotos,
+                  icon: const Icon(Icons.add_photo_alternate_outlined),
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: text,
+                    enabled: !sending,
+                    minLines: 1,
+                    maxLines: 4,
+                    maxLength: 2000,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: InputDecoration(
+                      hintText: t['status'] == 'resolved'
+                          ? 'Reply to reopen this request'
+                          : 'Write a message',
+                      counterText: '',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  tooltip: 'Send message',
+                  style: IconButton.styleFrom(backgroundColor: _green),
+                  onPressed: sending ? null : send,
+                  icon: const Icon(Icons.send_rounded),
+                ),
+              ],
             ),
           ],
         ),

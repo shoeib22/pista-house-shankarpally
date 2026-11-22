@@ -69,5 +69,9 @@
 
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Use your location to choose a delivery entrance on the map.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Attach a photo of your order to a support request.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a photo of your order to attach to a support request.</string>
 </dict>
 </plist>

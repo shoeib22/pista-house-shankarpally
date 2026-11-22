@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pista_core/pista_core.dart';
 import 'package:pista_customer/features/support/support_pages.dart';
@@ -283,4 +285,153 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+
+  test('only JPEG, PNG and WebP are recognised, by their first bytes', () {
+    Uint8List b(List<int> v) =>
+        Uint8List.fromList([...v, ...List.filled(20, 1)]);
+    expect(sniffImageType(b([0xff, 0xd8, 0xff, 0xe0])), 'image/jpeg');
+    expect(
+      sniffImageType(b([0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10])),
+      'image/png',
+    );
+    expect(
+      sniffImageType(
+        Uint8List.fromList([
+          ...'RIFF'.codeUnits,
+          1,
+          2,
+          3,
+          4,
+          ...'WEBP'.codeUnits,
+          9,
+          9,
+        ]),
+      ),
+      'image/webp',
+    );
+    expect(sniffImageType(Uint8List.fromList('<svg></svg>'.codeUnits)), isNull);
+  });
+
+  testWidgets(
+    'photos are attached to a new request, at most three, and can be removed',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final api = SupportApi();
+      // A valid 1x1 PNG so the thumbnail can really decode.
+      final png = base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      );
+      int asked = -1;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: pistaTheme(),
+          home: NewRequestPage(
+            api: api,
+            photoSource: (remaining) async {
+              asked = remaining;
+              return [
+                for (var i = 0; i < 4; i++) PickedPhoto(png, 'image/png'),
+              ];
+            },
+          ),
+        ),
+      );
+      await settle(tester);
+      await tester.tap(find.text('Add photos'));
+      await settle(tester);
+      expect(asked, 3);
+      expect(
+        find.byType(Image),
+        findsNWidgets(3),
+        reason: 'only three are kept',
+      );
+      expect(
+        find.text('Add more'),
+        findsNothing,
+        reason: 'the limit is reached',
+      );
+      await tester.tap(find.byKey(const ValueKey('remove-photo-0')));
+      await settle(tester);
+      expect(find.byType(Image), findsNWidgets(2));
+      await tester.tap(find.text('Food quality'));
+      await tester.enterText(
+        find.byType(TextFormField).last,
+        'The biryani was cold.',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Send request'));
+      await settle(tester);
+      final sent = api.sent.single['attachments'] as List;
+      expect(sent, hasLength(2));
+      expect(sent.first['contentType'], 'image/png');
+      expect(base64Decode(sent.first['data'] as String), png);
+    },
+  );
+
+  testWidgets('a photo that cannot be used shows why and nothing is attached', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: pistaTheme(),
+        home: NewRequestPage(
+          api: SupportApi(),
+          photoSource: (_) async =>
+              throw 'That photo is too large. Pick a smaller one.',
+        ),
+      ),
+    );
+    await settle(tester);
+    await tester.tap(find.text('Add photos'));
+    await settle(tester);
+    expect(
+      find.text('That photo is too large. Pick a smaller one.'),
+      findsOneWidget,
+    );
+    expect(find.byType(Image), findsNothing);
+  });
+
+  testWidgets('a reply can carry a photo, and photos on messages are shown', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final api = SupportApi();
+    api.messages.first['attachments'] = [
+      {'id': 'a1', 'contentType': 'image/jpeg', 'size': 1000},
+    ];
+    final png = base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: pistaTheme(),
+        home: TicketPage(
+          api: api,
+          ticketId: 't1',
+          pollEvery: const Duration(hours: 1),
+          photoSource: (_) async => [PickedPhoto(png, 'image/png')],
+        ),
+      ),
+    );
+    await settle(tester);
+    expect(find.byKey(const ValueKey('photo-a1')), findsOneWidget);
+    await tester.tap(find.byTooltip('Attach photos'));
+    await settle(tester);
+    await tester.enterText(find.byType(TextField), 'Here is the box');
+    await tester.tap(find.byTooltip('Send message'));
+    await settle(tester);
+    final reply = api.sent.last;
+    expect(reply['body'], 'Here is the box');
+    expect((reply['attachments'] as List).single['contentType'], 'image/png');
+    await tester.pumpWidget(const SizedBox());
+  });
 }

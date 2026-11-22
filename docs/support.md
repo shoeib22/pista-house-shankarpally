@@ -35,3 +35,19 @@ Added 23 November 2026 (API 0.10.0). A help desk that lives inside the apps, wit
 - **Counter staff have no screen yet.** The server already allows the counter role, but the only staff apps are the owner app (which has this) and the web dashboard (which does not). A dashboard inbox is the next step.
 - No live chat presence, no multiple outlets, no automatic routing or templates beyond the five canned replies, and no export or report beyond the summary strip.
 - Refunds are decided and issued by the owner (see `payments.md`); the support desk only links to them.
+
+## Photos
+
+A request or reply may carry up to 3 photos (JPEG, PNG or WebP, 800 KB each,
+base64 in the JSON body; the server accepts bodies up to 4 MB). The first bytes
+must match the declared type, so renamed files and SVG are refused. Photos are
+stored in the database and fetched with `GET /api/support/attachments/:id`,
+only by the customer who owns the request (never from an internal note) and
+support staff of the same outlet. Responses carry `nosniff` and a locked-down
+CSP. Photos are deleted after `SUPPORT_ATTACHMENT_DAYS` (default 90); the
+message text stays.
+
+## Alerts
+
+A customer message alerts owner/counter staff; a staff reply alerts the customer
+(see notifications.md).

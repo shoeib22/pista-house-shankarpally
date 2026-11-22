@@ -77,6 +77,7 @@ class _DeliveryHomeState extends State<DeliveryHome> {
       appBar: AppBar(
         title: const Text('Delivery partner'),
         actions: [
+          if (model.api.token != null) NotificationBell(api: model.api),
           if (const bool.fromEnvironment('BETA_TESTING'))
             IconButton(
               tooltip: 'Beta server',

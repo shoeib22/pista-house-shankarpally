@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:pista_ui/pista_ui.dart';
 import 'package:pista_core/pista_core.dart';
+import 'package:pista_tracking/pista_tracking.dart';
 import '../payments/refund_page.dart';
 
 const _amber = Color(0xFF956233);
@@ -644,6 +645,10 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                 height: 1.4,
                 color: staff && !internal ? Colors.white : Colors.black87,
               ),
+            ),
+            SupportPhotoRow(
+              api: widget.api,
+              photos: (m['attachments'] as List?) ?? const [],
             ),
             Text(
               ago('${m['createdAt']}'),

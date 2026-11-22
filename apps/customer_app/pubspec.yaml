@@ -13,6 +13,7 @@ dependencies:
     path: ../../packages/mobile_tracking
   pista_core:
     path: ../../packages/mobile_core
+  image_picker: ^1.2.4
 dev_dependencies:
   flutter_test:
     sdk: flutter

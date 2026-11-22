@@ -36,6 +36,10 @@ import {
 import { Mailer } from "./mailer";
 import { Support, SupportController } from "./support";
 import {
+  Notifications,
+  NotificationsController,
+} from "./notifications/notifications";
+import {
   PaymentWebhookController,
   Payments,
   PaymentsController,
@@ -266,6 +270,7 @@ class ProtectedController {
     PaymentsController,
     PaymentWebhookController,
     SupportController,
+    NotificationsController,
     AccountManagementController,
     TrackingController,
     MapsController,
@@ -279,6 +284,7 @@ class ProtectedController {
     Mailer,
     EmailAccounts,
     Payments,
+    Notifications,
     Support,
     Dispatch,
     Accounts,

@@ -3,6 +3,7 @@ import "dotenv/config";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app";
 import { validateRuntime } from "./runtime";
+import { configureBody } from "./body";
 async function main() {
   validateRuntime();
   if (
@@ -12,6 +13,7 @@ async function main() {
     throw new Error("Development adapters are prohibited in production");
   // rawBody: payment webhooks are signed over the exact bytes received.
   const app = await NestFactory.create(AppModule, { rawBody: true });
+  configureBody(app);
   app.enableCors({
     origin: process.env.DASHBOARD_ORIGIN || "http://localhost:5173",
     methods: ["GET", "POST", "PATCH", "DELETE"],

@@ -2,6 +2,7 @@ import 'package:pista_ui/pista_ui.dart';
 import 'package:pista_core/pista_core.dart';
 import 'features/orders/widgets/order_actions.dart';
 import 'features/support/support_pages.dart';
+import 'package:pista_tracking/pista_tracking.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -117,6 +118,7 @@ class _OwnerHomeState extends State<OwnerHome> {
     appBar: AppBar(
       title: const Text('Outlet overview'),
       actions: [
+        if (signedIn) NotificationBell(api: api),
         if (const bool.fromEnvironment('BETA_TESTING'))
           IconButton(
             tooltip: 'Beta server',
