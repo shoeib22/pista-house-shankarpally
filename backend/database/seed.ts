@@ -16,7 +16,12 @@ async function seed() {
   await db.outlet.upsert({
     where: { id: "shankarpally" },
     update: {},
-    create: { id: "shankarpally", name: "Pista House · Shankarpally" },
+    create: {
+      id: "shankarpally",
+      name: "Pista House · Shankarpally",
+      latitude: 17.4538158,
+      longitude: 78.1410641,
+    },
   });
   for (const role of [
     "customer",

@@ -10,6 +10,8 @@ model Outlet {
   id            String         @id
   name          String
   paused        Boolean        @default(false)
+  latitude      Float?
+  longitude     Float?
   users         User[]
   products      Product[]
   orders        Order[]
@@ -169,6 +171,10 @@ model DeliveryAssignment {
   otpAttempts   Int               @default(0)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
+  location      Json?
+  locationAt    DateTime?
+  locationRecordedAt DateTime?
+  locationLease String?
   events        AssignmentEvent[]
 
   @@index([riderId, isActive, createdAt])

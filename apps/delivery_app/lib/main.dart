@@ -3,16 +3,20 @@ import 'features/tasks/widgets/verification_dialog.dart';
 import 'package:pista_ui/pista_ui.dart';
 import 'package:pista_core/pista_core.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:pista_tracking/pista_tracking.dart';
 
-Future<void> main()async{WidgetsFlutterBinding.ensureInitialized();await BetaEndpoint.restore();runApp(
-  MaterialApp(
-    title: 'Pista House Delivery',
-    theme: pistaTheme(),
-    home: const DeliveryHome(),
-    debugShowCheckedModeBanner: false,
-  ),
-);}
-
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await BetaEndpoint.restore();
+  runApp(
+    MaterialApp(
+      title: 'Pista House Delivery',
+      theme: pistaTheme(),
+      home: const DeliveryHome(),
+      debugShowCheckedModeBanner: false,
+    ),
+  );
+}
 
 class DeliveryHome extends StatefulWidget {
   final DeliveryModel? model;
@@ -72,7 +76,22 @@ class _DeliveryHomeState extends State<DeliveryHome> {
       appBar: AppBar(
         title: const Text('Delivery partner'),
         actions: [
-if(const bool.fromEnvironment('BETA_TESTING'))IconButton(tooltip:'Beta server',icon:const Icon(Icons.dns_outlined),onPressed:()=>showDialog<void>(context:context,builder:(context)=>BetaServerDialog(initialUrl:model.api.baseUrl,onConnect:(url)async{await model.api.configureBetaServer(url);await BetaEndpoint.save(model.api.baseUrl);model.clearSession();}))),
+          if (const bool.fromEnvironment('BETA_TESTING'))
+            IconButton(
+              tooltip: 'Beta server',
+              icon: const Icon(Icons.dns_outlined),
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (context) => BetaServerDialog(
+                  initialUrl: model.api.baseUrl,
+                  onConnect: (url) async {
+                    await model.api.configureBetaServer(url);
+                    await BetaEndpoint.save(model.api.baseUrl);
+                    model.clearSession();
+                  },
+                ),
+              ),
+            ),
           if (model.signedIn)
             IconButton(
               tooltip: 'Your account',
@@ -251,7 +270,9 @@ if(const bool.fromEnvironment('BETA_TESTING'))IconButton(tooltip:'Beta server',i
                       queryParameters: {
                         'api': '1',
                         'destination':
-                            '${a['line1']}, ${a['city']}, ${a['postalCode']}',
+                            a['latitude'] != null && a['longitude'] != null
+                            ? '${a['latitude']},${a['longitude']}'
+                            : '${a['line1']}, ${a['city']}, ${a['postalCode']}',
                       },
                     ),
                   ),
@@ -276,6 +297,12 @@ if(const bool.fromEnvironment('BETA_TESTING'))IconButton(tooltip:'Beta server',i
               child: const Text('Confirm pickup'),
             ),
           if (task['status'] == 'picked_up') ...[
+            RiderLocationSharing(
+              key: ValueKey(task['id']),
+              api: model.api,
+              assignmentId: task['id'],
+              orderId: order['id'],
+            ),
             FilledButton(
               onPressed: model.busy || !model.connected
                   ? null

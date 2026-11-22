@@ -18,6 +18,8 @@ The server resolves the actor from a hashed opaque session token. Clients cannot
 | Rider availability/tasks | No | No | No | Own | No |
 | Pickup/fail/verify delivery | No | No | No | Assigned active task | No |
 | Request delivery code | Own active delivery | No | No | No | No |
+| Watch live delivery location | Own delivery | Outlet | No | Own active assignment | Outlet |
+| Start/publish/stop a GPS sharing lease | No | No | No | Assigned active picked-up task | No |
 | Invite/recover/suspend staff or riders | No | No | No | No | Outlet |
 | Change own password / revoke own sessions | No password account | Own | Own | Own | Own |
 

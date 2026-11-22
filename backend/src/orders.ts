@@ -23,8 +23,14 @@ export const checkout = z
         city: z.string().trim().min(2).max(80),
         postalCode: z.string().regex(/^\d{6}$/),
         landmark: z.string().trim().max(150).optional(),
+        latitude: z.number().finite().min(-90).max(90).optional(),
+        longitude: z.number().finite().min(-180).max(180).optional(),
       })
       .strict()
+      .refine(
+        (a) => (a.latitude === undefined) === (a.longitude === undefined),
+        "Both map coordinates are required",
+      )
       .optional(),
     items: z
       .array(

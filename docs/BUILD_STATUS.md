@@ -1,93 +1,58 @@
-# Build status · 20 November 2026
+# Build status - 22 November 2026
 
-## TestFlight preparation · 20 November 2026
-
-- Source: https://github.com/shoeib22/pista-house-shankarpally (master).
-- Three app-specific Codemagic workflows use the existing Apple distribution setup.
-- All three bundle IDs and App Store Connect app records are registered; numeric IDs are in `release/testflight-apps.json`.
-- Three new app-specific App Store profiles imported into Codemagic, each matching the existing shared Qube certificate; unrelated app profiles were unchanged.
-- Latest mobile checks: clean Flutter analysis for all three; customer 3 ordinary + 3 beta tests, delivery 4, owner 5 (15 pass). Signing selector tests: 3 pass.
-- First customer CI run passed analysis, tests and signing verification, then stopped on an empty Apple build history. Fixed the first-upload numbering to use the Codemagic project counter. Corrected customer, delivery and owner runs finished successfully. Customer version 0.1.0 build 4 uploaded and was verified Ready to Test in App Store Connect. Delivery version 0.1.0 build 5 uploaded successfully; its last observed Apple state was Processing. Owner upload log also confirms no errors uploading the signed IPA. Delivery and owner final TestFlight compliance/testing states have not been verified. No tester invitations were sent.
-- Backend server recovery is deferred at the user's request. Beta builds can configure the isolated HTTPS endpoint after installation. The earlier backend test/audit checkpoint below predates the beta server changes and dependency additions; new database-backed beta tests have not completed.
+> Latest handoff: a newer exact-reference home / liquid-glass navigation iteration is now in progress and the customer app currently has four compile errors. The verification results below describe the preceding maps/tracking baseline. Read `../handoff.md` for the current continuation point.
 
 ## Current result
 
-The local build connects customer, employee, owner and rider workflows on one NestJS/PostgreSQL backend. Version 0.3 adds credential-backed operational accounts, owner invitations/recovery, account suspension, passphrase changes and session revocation. Pickup/delivery, kitchen updates and code-verified delivery remain working.
+The customer app now implements the user-supplied heritage design direction, product detail, delivery map-pin selection, explicit area/landmark search and active-order live delivery tracking. The rider app has opt-in real GPS sharing, using authenticated Socket.IO WebSocket transport on the shared NestJS/PostgreSQL backend. The employee dashboard and owner app retain their existing operational workflows, with the shared updated typography and palette in the mobile apps.
 
-This is not a production launch. Customer phone verification, live payments/refunds, notifications and production hosting remain unconfigured. Catalogue, service zones and review orders are samples. No public customer storefront, COD or separately scoped Petpooja integration was added.
+The confirmed Shankarpally outlet pin is stored at 17.4538158, 78.1410641. This does not approve any real delivery zone or change delivery fees. The only configured beta zone remains sample PIN 000000.
+
+See `live_tracking.md` for permissions, provider setup, protocol and device-test limits. See `design/heritage-redesign.md` for the user's references, illustration generation prompt, font licensing and UI evidence. The user's promised Shankarpally logo remains pending; the customer header uses a temporary text wordmark and the existing logo asset is preserved.
 
 ## Verified
 
-| Check | Observed result |
-|---|---|
-| Backend tests | 18 pass, including real HTTP/PostgreSQL account, pickup and delivery journeys |
-| Mobile tests | Owner 5, rider 4, customer 3 pass: 12 total |
-| Total tests | 30 pass |
-| Flutter analysis | Clean across all three apps |
-| API/dashboard build | TypeScript and Vite builds pass |
-| Android | All three current debug APKs compile/package successfully |
-| OpenAPI | Version 0.3.0 validates; TypeScript definitions and Dart DTOs generated |
-| PostgreSQL | Five versioned migrations applied; existing data preserved |
-| Dependency audit | 0 reported advisories in the full npm dependency tree |
-| Browser | In-app browser sign-in options, invitation form, test-owner access, Team metadata and Account/session view inspected |
-| Setup boundary | Bootstrap helper refuses a second enabled owner; disabled CLI invocation fails closed |
-| Fixture cleanup | 0 remaining account-test outlets; 0 real owner password accounts provisioned for Shankarpally |
+| Check | Result |
+| --- | --- |
+| Backend tests | 28 pass, including 7 map/tracking cases using the real database and WebSocket server |
+| Mobile functional tests | Customer 4 ordinary + 3 beta, rider 4, owner 5: 16 pass |
+| Direct Dart client smoke check | Passed starting a lease, receiving snapshots, stopping and rejecting delayed GPS through the real loopback Nest server |
+| Flutter analysis | Clean for all three apps and the new shared tracking package |
+| Backend compilation | TypeScript build passes |
+| Employee dashboard | TypeScript/Vite build passes |
+| API contract | API 0.4.0 validates; Dart/TypeScript models regenerated, including coordinate fields |
+| Database | 9 migrations applied to the project's development and isolated beta databases; no data-volume reset |
+| Android | Customer and rider debug APKs compile with maps, native location plugins and permissions |
+| iOS metadata | Customer location usage and rider location/background declarations parse correctly |
+| Visual evidence | Real Flutter home/detail renders; actual OSM tiles, Photon area search, retained delivery pin and OSRM route verified through the local API with simulated GPS; 430x932 and 320x700 tracking layouts checked |
 
-## Account evidence
+The direct client/visual fixtures are temporary, loopback-only QA data. They do not use real customer locations or live restaurant payments. Generated tokens, test-account files, environment files, native build output and preview entrypoints remain ignored. The temporary QA outlet, its order/users/sessions and task-owned preview processes were cleaned up after evidence capture.
 
-- Password sign-in works with development adapters off for non-development accounts. Invalid passwords, wrong app audience and unknown handles fail generically.
-- Invitations bind role/outlet, expire, revoke and accept only once. Two simultaneous acceptance requests produce one account/session and one conflict. Only owners manage workers; owner promotion/creation is not an invitation option.
-- Password changes and recovery invalidate previous sessions and pending recovery codes. Session lists expose only the current user's metadata; tokens/hashes are not returned.
-- Suspension immediately revokes access. Dispatch racing with suspension cannot leave an uncollected job assigned to the disabled rider. Picked-up jobs become staff-review delivery exceptions without changing payment, and require physical-return confirmation.
-- A stale request captured before rider suspension cannot restore availability. The rider app clears cached tasks and contacts after revocation.
-- Seeded identities, their invitations and resulting password accounts remain development-only. Previously issued development sessions also stop working when development mode is disabled.
-- Database-backed throttles persist attempt counts and reject forwarded-header bypass attempts in the isolated test server. Real proxy configuration/load remains unverified.
-- Passwords use salted, versioned scrypt hashes with bounded derivation concurrency. No plaintext passwords or invitation tokens are stored in the database.
-- Integration fixtures use isolated outlets, generated test passphrases and targeted cleanup. No database reset or truncation was performed. The first real owner still needs the operator's local setup.
+## Tracking guarantees
 
-## Existing order/delivery evidence
+- A customer can watch only their own order. Owner/counter access is outlet-scoped, kitchen access is denied and unrelated riders cannot subscribe.
+- Authentication is checked before socket acceptance, for incoming actions and for outgoing snapshots. Revocation closes existing subscriptions and removes a publisher's active lease.
+- The rider must explicitly start a lease after pickup. Stops and obsolete devices cannot revive or overwrite a newer lease. Conditional database writes also enforce assignment state, rider ownership, throttling and fix ordering.
+- GPS above 100-metre inaccuracy, old fixes and materially future-dated fixes are rejected. Stale/disconnected data is not shown as live; unavailable routing produces no invented arrival time.
+- Only the latest GPS point is stored. Stops, completion, failed-delivery escalation and suspension remove current GPS access. No off-shift tracking or GPS history recorder was introduced.
+- Map selection preserves server-side PIN-code serviceability. Payments, fulfilment, manual assignment, physical-return handling and delivery-code verification retain their separate state controls.
 
-Pricing and validated zone charges remain authoritative integer paise with item snapshots. Duplicate checkout/payment retries do not duplicate orders/events. Concurrent acceptance/assignment produces one winner. Unpaid or skipped transitions are rejected.
+## Remaining launch/device gates
 
-Riders can read only their tasks. Active assigned/picked-up jobs include necessary customer details; failed/history responses strip them. Kitchen responses omit delivery addresses. Delivery codes expire, enforce issuance/cooldown limits and lock after five incorrect guesses; failures commit their attempt counts. Repeated completion cannot duplicate fulfilment. Failed delivery never automatically cancels/refunds an order.
+Physical iPhone/Android checks are still required for actual GPS accuracy, lock-screen/background delivery, permission denial, low-power/network loss, navigation/calling and relaunch behaviour. Force-quit durability is not claimed. The updated iOS apps have not been built or uploaded to TestFlight in this feature task.
 
-Widget tests exercise customer checkout/address entry, owner sign-in/dispatch/return confirmation, invitation validation and rider verification/reconnection. The interrupted-response test keeps completion unconfirmed until a server read reconciles it.
+OpenStreetMap tiles, the Photon demo search endpoint and the OSRM demo router are for moderate beta testing. Production needs approved map/search/routing providers, their usage/attribution/privacy setup and monitoring. ETA is road travel time without traffic or preparation time.
 
-## Browser review
+Other remaining gates include customer phone authentication, real gateway/refunds and reconciliation, restaurant-approved menu/taxes/zones/policies, variants/add-ons, saved address books, rewards/coupons/favourites/reorder, push/SMS workers, expanded owner reporting, durable mobile sessions/retries, production packaging/TLS, backups/restores, dependency advisory review, security/load testing and store release readiness. No COD, automatic dispatch, route optimisation, public customer storefront or Petpooja integration was added.
 
-The refreshed in-app browser successfully showed Sign in, Use invitation and Test access. Test-owner sign-in loaded outlet records, Team controls and private active-session metadata. The Team view remains available in the preview.
+## Distribution history
 
-Evidence: `docs/qa/team-access-2026-11-20.jpg`.
+The earlier three iOS apps were uploaded through the existing Qube Codemagic signing route. Customer 0.1.0 build 4 was verified Ready to Test; delivery 0.1.0 build 5 and the owner IPA uploaded successfully. Those uploads predate the maps/redesign work. They do not demonstrate that these new features are installed in TestFlight. App identifiers and signing references remain in `release/testflight-apps.json` and `codemagic.yaml`; unrelated Xerovolt configuration was not changed.
 
-No real credentials were entered or changed through browser automation. Invitation activation/password mutation are verified by HTTP integration and mobile form tests. Comprehensive tablet/keyboard testing, two simultaneous browser sessions and full real-account browser onboarding remain unverified.
+## Local operation
 
-## Native/build limits
+Keep secrets in ignored local files. Standard development uses `npm run dev:api` and `npm run dev:dashboard`. The separate PC beta supervisor is `node scripts/start-beta-server.mjs` with the isolated `backend/.env.beta`; its temporary HTTPS URL can change on restart. No old tunnel URL is asserted current here. The customer app's drawer contains Beta server settings.
 
-All APKs are development packages with debug signing and explicit test-login support. They target the emulator host API at http://10.0.2.2:3001/api and require a running backend. They are not standalone offline demos or app-store releases. A physical test phone needs an appropriate rebuilt API URL.
+A scoped helper, `scripts/repair-flutter-cache.ps1`, clears read-only attributes on this project's generated Flutter artifacts if Windows prevents asset replacement; it does not reset database volumes or remove source files. The existing PostgreSQL query-concurrency deprecation warning is still upstream and is not a test failure.
 
-No native device/emulator was connected; installation, navigation/calling and a physical-device journey remain unverified. iOS compilation/signing requires macOS/Xcode.
-
-Windows read-only attributes on generated Flutter/Gradle folders initially blocked cache replacement. They were repaired within the project; all final native builds passed. A bounded helper is available at `scripts/repair-flutter-cache.ps1`; source assets and database records were not deleted.
-
-The PostgreSQL driver still emits an upstream query-concurrency deprecation warning during race tests. No pg 9 upgrade or workaround is claimed.
-
-## Production gates
-
-No default owner password exists. Use the local masked `npm run auth:bootstrap` procedure in `account_access.md` to provision the actual owner; disable its opt-in setting afterwards. Password access does not mean the entire platform is production-ready.
-
-Remaining gates include customer phone/SMS, selected gateway/refund reconciliation, approved menu/tax/delivery policy, saved addresses/map pins, rewards/coupons, outbox/notification workers, remaining owner reporting, secure durable mobile sessions, TLS/service packaging, rate limits across other endpoints, backups/restores, monitoring, load/device testing and store release. MFA, retention and production security review remain open. Trusted proxy behavior must be configured deliberately.
-
-The sample postcode 000000 is not an approved real service area. The health `otp` field refers to customer phone authentication; `deliveryVerification` describes the separate configured in-app handoff-code mechanism. Petpooja remains disabled and separately scoped. Original commercial figures and exclusions are unchanged.
-
-## Local review
-
-API: http://127.0.0.1:3001/api. Dashboard: http://127.0.0.1:5173.
-
-Run `npm run dev:api` and `npm run dev:dashboard`. For sample access choose **Test access → Owner**; Team and Account are in navigation. Team actions from this identity create development-only accounts. Environment files remain ignored and PostgreSQL data stays in the persistent project volume.
-
-Debug APKs:
-
-- `apps/customer_app/build/app/outputs/flutter-apk/app-debug.apk`
-- `apps/owner_app/build/app/outputs/flutter-apk/app-debug.apk`
-- `apps/delivery_app/build/app/outputs/flutter-apk/app-debug.apk`
 

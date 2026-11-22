@@ -149,13 +149,21 @@ class DeliveryAddressDto {
   final String city;
   final String postalCode;
   final String? landmark;
+  final double? latitude;
+  final double? longitude;
   DeliveryAddressDto.fromJson(Map<String, dynamic> json)
     : recipient = json['recipient'] as String,
       phone = json['phone'] as String,
       line1 = json['line1'] as String,
       city = json['city'] as String,
       postalCode = json['postalCode'] as String,
-      landmark = json['landmark'] == null ? null : json['landmark'] as String;
+      landmark = json['landmark'] == null ? null : json['landmark'] as String,
+      latitude = json['latitude'] == null
+          ? null
+          : (json['latitude'] as num).toDouble(),
+      longitude = json['longitude'] == null
+          ? null
+          : (json['longitude'] as num).toDouble();
 }
 
 class AssignmentSummaryDto {

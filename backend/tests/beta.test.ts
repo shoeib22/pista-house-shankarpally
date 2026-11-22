@@ -239,6 +239,8 @@ test("private beta customer can complete a simulated delivery while anonymous de
       line1: "Sample beta address only",
       city: "Sample city",
       postalCode: "000000",
+      latitude: 17.4518,
+      longitude: 78.1286,
     },
   };
   const created = await call(
@@ -251,6 +253,8 @@ test("private beta customer can complete a simulated delivery while anonymous de
   assert.equal(created.status, 201);
   let order = created.data;
   orderIds.push(order.id);
+  assert.equal(order.deliveryAddress.latitude, 17.4518);
+  assert.equal(order.deliveryAddress.longitude, 78.1286);
   assert.equal(order.totalPaise, 3000);
   assert.equal(
     (

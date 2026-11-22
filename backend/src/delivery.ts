@@ -226,6 +226,7 @@ export class Delivery {
         data: {
           status,
           isActive: false,
+          locationLease: null,
           version: { increment: 1 },
           otpHash: null,
           otpSalt: null,
@@ -285,7 +286,16 @@ export class Delivery {
           status,
           version: { increment: 1 },
           failureReason: reason,
-          ...(action === "fail" ? { otpHash: null, otpSalt: null } : {}),
+          ...(action === "fail"
+            ? {
+                otpHash: null,
+                otpSalt: null,
+                location: Prisma.DbNull,
+                locationAt: null,
+                locationRecordedAt: null,
+                locationLease: null,
+              }
+            : {}),
         },
       });
       if (!changed.count) throw new ConflictException("Task changed; refresh");
@@ -421,6 +431,10 @@ export class Delivery {
         data: {
           status: "delivered",
           isActive: false,
+          location: Prisma.DbNull,
+          locationAt: null,
+          locationRecordedAt: null,
+          locationLease: null,
           otpHash: null,
           otpSalt: null,
         },

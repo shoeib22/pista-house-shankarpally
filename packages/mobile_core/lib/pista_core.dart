@@ -4,6 +4,7 @@ import 'package:pista_api/pista_api.dart';
 export 'package:pista_api/pista_api.dart';
 export 'features/delivery/delivery_model.dart';
 export 'beta_endpoint.dart';
+export 'device_dish_saves.dart';
 
 String requestKey() => List.generate(
   24,
@@ -26,7 +27,21 @@ class CustomerModel extends ChangeNotifier {
   String? error;
   String fulfilment = 'pickup';
   Map<String, dynamic>? deliveryAddress;
+  Map<String, dynamic>? outletLocation;
   bool get checkoutLocked => _checkoutKey != null || pendingOrder != null;
+  void resetForServer() {
+    api.token = null;
+    orders = [];
+    cart.clear();
+    pendingOrder = null;
+    deliveryAddress = null;
+    outletLocation = null;
+    _checkoutKey = null;
+    _paymentEvent = null;
+    error = null;
+    notifyListeners();
+  }
+
   void configureCheckout(String mode, Map<String, dynamic>? address) {
     if (busy || checkoutLocked) return;
     fulfilment = mode;
@@ -43,6 +58,33 @@ class CustomerModel extends ChangeNotifier {
   int get quantity => cart.values.fold(0, (a, b) => a + b);
   int get estimate =>
       products.fold(0, (sum, p) => sum + p.pricePaise * (cart[p.id] ?? 0));
+  String reorder(Map<String, dynamic> order) {
+    if (busy || checkoutLocked)
+      return 'Finish or resolve your current checkout first.';
+    final next = <String, int>{};
+    var unavailable = false;
+    for (final item in order['items'] as List? ?? []) {
+      final id = item['productId'];
+      final current = products.where((p) => p.id == id && p.available);
+      if (current.isEmpty) {
+        unavailable = true;
+        continue;
+      }
+      final quantity = ((item['quantity'] as num?)?.toInt() ?? 1).clamp(1, 20);
+      next[id] = ((next[id] ?? 0) + quantity).clamp(1, 20);
+    }
+    if (next.isEmpty) return 'These dishes are not available on today’s menu.';
+    cart
+      ..clear()
+      ..addAll(next);
+    fulfilment = 'pickup';
+    deliveryAddress = null;
+    notifyListeners();
+    return unavailable
+        ? 'Some dishes are unavailable. Review the current menu and prices.'
+        : 'Review current prices and choose pickup or delivery.';
+  }
+
   Future<void> work(Future<void> Function() action) async {
     if (busy) return;
     busy = true;
@@ -75,6 +117,9 @@ class CustomerModel extends ChangeNotifier {
         .map((p) => Product(Map<String, dynamic>.from(p)))
         .toList();
     paused = data[1]['paused'];
+    outletLocation = data[1]['latitude'] is num && data[1]['longitude'] is num
+        ? {'latitude': data[1]['latitude'], 'longitude': data[1]['longitude']}
+        : null;
     if (api.token != null)
       orders = (await api.request('/orders') as List)
           .map((o) => Map<String, dynamic>.from(o))

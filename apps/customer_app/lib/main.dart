@@ -3,6 +3,10 @@ import 'features/checkout/screens/checkout_sheet.dart';
 import 'features/checkout/screens/beta_access_sheet.dart';
 import 'package:pista_ui/pista_ui.dart';
 import 'package:pista_core/pista_core.dart';
+import 'package:pista_tracking/pista_tracking.dart';
+import 'features/menu/heritage_menu.dart';
+import 'features/menu/reference_home.dart';
+import 'features/menu/glass_navigation.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,8 +36,8 @@ class _CustomerHomeState extends State<CustomerHome> {
   late final model = widget.model ?? CustomerModel(PistaApi());
   late final Timer poll;
   int tab = 0;
-  String search = '', category = 'All';
-  bool vegOnly = false;
+  String menuCategory = 'All';
+
   final Map<String, Map<String, dynamic>> deliveryCodes = {};
   @override
   void initState() {
@@ -53,51 +57,99 @@ class _CustomerHomeState extends State<CustomerHome> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: model,
     builder: (context, _) => Scaffold(
-      appBar: AppBar(
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Shankarpally',
-              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
-            ),
-            Text(
-              'Pickup & delivery',
-              style: TextStyle(fontSize: 12, color: Colors.black54),
-            ),
-          ],
-        ),
-        leading: const Icon(Icons.location_on_outlined, color: pistaGreen),
-        actions: [
-          if (const bool.fromEnvironment('BETA_TESTING'))
-            IconButton(
-              tooltip: 'Beta server',
-              icon: const Icon(Icons.dns_outlined),
-              onPressed: () => showDialog<void>(
-                context: context,
-                builder: (context) => BetaServerDialog(
-                  initialUrl: model.api.baseUrl,
-                  onConnect: (url) async {
-                    await model.api.configureBetaServer(url);
-                    await BetaEndpoint.save(model.api.baseUrl);
-                    model.orders = [];
-                    model.pendingOrder = null;
-                    deliveryCodes.clear();
-                    await model.refresh();
-                  },
+      extendBody: true,
+      drawer: Drawer(
+        backgroundColor: heritageCream,
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Text(
+                  'Pista House\nShankarpally',
+                  style: TextStyle(
+                    fontFamily: 'packages/pista_ui/HouseSerif',
+                    fontSize: 32,
+                    color: heritageGreen,
+                  ),
                 ),
               ),
-            ),
-          IconButton(
-            tooltip: 'Refresh',
-            onPressed: model.busy ? null : model.refresh,
-            icon: const Icon(Icons.refresh),
+              const DevelopmentBanner(),
+              for (final entry in [
+                (0, 'Home', Icons.home_outlined),
+                (1, 'Menu', Icons.restaurant_menu),
+                (2, 'Orders', Icons.receipt_long_outlined),
+                (3, 'Profile', Icons.person_outline),
+              ])
+                ListTile(
+                  leading: Icon(entry.$3, color: heritageGreen),
+                  title: Text(entry.$2),
+                  onTap: () {
+                    Navigator.pop(context);
+                    setState(() => tab = entry.$1);
+                  },
+                ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.refresh),
+                title: const Text('Refresh menu and orders'),
+                onTap: () {
+                  Navigator.pop(context);
+                  model.refresh();
+                },
+              ),
+              if (const bool.fromEnvironment('BETA_TESTING'))
+                ListTile(
+                  leading: const Icon(Icons.dns_outlined),
+                  title: const Text('Beta server settings'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _serverSettings();
+                  },
+                ),
+            ],
           ),
-        ],
+        ),
       ),
+      appBar: tab == 0
+          ? null
+          : AppBar(
+              centerTitle: true,
+              title: const Text(
+                'Pista House',
+                style: TextStyle(
+                  fontFamily: 'packages/pista_ui/HouseSerif',
+                  fontSize: 29,
+                  fontWeight: FontWeight.w600,
+                  color: heritageGreen,
+                ),
+              ),
+              leading: Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Open menu',
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                  icon: const Icon(Icons.menu_rounded, color: heritageGreen),
+                ),
+              ),
+              actions: [
+                IconButton(
+                  tooltip: 'View cart',
+                  onPressed: model.quantity == 0 ? null : _checkout,
+                  icon: Badge(
+                    isLabelVisible: model.quantity > 0,
+                    label: Text('${model.quantity}'),
+                    child: const Icon(
+                      Icons.shopping_cart_outlined,
+                      color: heritageGreen,
+                    ),
+                  ),
+                ),
+              ],
+            ),
       body: Column(
         children: [
-          const DevelopmentBanner(),
+          if (tab != 0) const DevelopmentBanner(),
           if (model.error != null)
             MaterialBanner(
               content: Text(model.error!),
@@ -120,34 +172,49 @@ class _CustomerHomeState extends State<CustomerHome> {
                 ? _orders()
                 : tab == 3
                 ? _profile()
-                : _menu(),
+                : tab == 4
+                ? _offers()
+                : tab == 0
+                ? Builder(
+                    builder: (context) => RefreshIndicator(
+                      onRefresh: model.refresh,
+                      child: ReferenceHome(
+                        model: model,
+                        openMenu: () => Scaffold.of(context).openDrawer(),
+                        checkout: _checkout,
+                        seeAll: () => setState(() {
+                          menuCategory = 'All';
+                          tab = 1;
+                        }),
+                        category: (value) => setState(() {
+                          menuCategory = value == 'Sweets' ? 'Desserts' : value;
+                          tab = 1;
+                        }),
+                      ),
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: model.refresh,
+                    child: HeritageMenu(
+                      model: model,
+                      home: tab == 0,
+                      checkout: _checkout,
+                      initialCategory: menuCategory,
+                    ),
+                  ),
           ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: tab,
-        onDestinationSelected: (i) => setState(() => tab = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.restaurant_menu),
-            label: 'Menu',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            label: 'Orders',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            label: 'Profile',
-          ),
-        ],
+      bottomNavigationBar: GlassNavigation(
+        selectedIndex: switch (tab) {
+          2 => 1,
+          4 => 2,
+          3 => 3,
+          _ => 0,
+        },
+        onSelected: (index) => setState(() => tab = const [0, 2, 4, 3][index]),
       ),
-      bottomSheet: model.quantity > 0 && tab < 2
+      bottomSheet: model.quantity > 0 && tab == 1
           ? SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(14),
@@ -157,7 +224,7 @@ class _CustomerHomeState extends State<CustomerHome> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '${model.quantity} items · ${rupees(model.estimate)}',
+                        '${model.quantity} ${model.quantity == 1 ? 'item' : 'items'} · ${rupees(model.estimate)}',
                       ),
                       const Text('View order →'),
                     ],
@@ -168,231 +235,19 @@ class _CustomerHomeState extends State<CustomerHome> {
           : null,
     ),
   );
-  Widget _menu() {
-    final products = model.products
-        .where(
-          (p) =>
-              (category == 'All' || p.category == category) &&
-              (!vegOnly || p.vegetarian) &&
-              p.name.toLowerCase().contains(search.toLowerCase()),
-        )
-        .toList();
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 95),
-      children: [
-        const PistaLogo(),
-        const SizedBox(height: 20),
-        if (tab == 0)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Stack(
-              children: [
-                Image.asset(
-                  'assets/biryani-cover.png',
-                  package: 'pista_ui',
-                  height: 185,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
-                Container(
-                  height: 185,
-                  width: double.infinity,
-                  color: Colors.black.withValues(alpha: .3),
-                ),
-                const Positioned(
-                  left: 20,
-                  top: 27,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'THE HOUSE SIGNATURE',
-                        style: TextStyle(
-                          color: Color(0xFFECD8A0),
-                          letterSpacing: 2,
-                          fontSize: 10,
-                        ),
-                      ),
-                      SizedBox(height: 12),
-                      Text(
-                        'Dum. Done\nroyally.',
-                        style: TextStyle(
-                          fontFamily: 'serif',
-                          color: Colors.white,
-                          fontSize: 33,
-                          height: 1.08,
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      Text(
-                        'Concept photography',
-                        style: TextStyle(color: Colors.white70, fontSize: 9),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        const SizedBox(height: 20),
-        Text(
-          tab == 0 ? 'House favourites' : 'Find your favourite.',
-          style: TextStyle(
-            fontSize: tab == 0 ? 25 : 29,
-            fontWeight: FontWeight.w600,
-            fontFamily: tab == 1 ? 'serif' : null,
-          ),
-        ),
-        const SizedBox(height: 17),
-        TextField(
-          decoration: const InputDecoration(
-            hintText: 'Search biryani, starters & more',
-            prefixIcon: Icon(Icons.search),
-          ),
-          onChanged: (v) => setState(() => search = v),
-        ),
-        const SizedBox(height: 12),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: ['All', 'Biryani', 'Starters', 'Desserts']
-                .map(
-                  (c) => Padding(
-                    padding: const EdgeInsets.only(right: 7),
-                    child: ChoiceChip(
-                      label: Text(c),
-                      selected: category == c,
-                      onSelected: (_) => setState(() => category = c),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-        ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilterChip(
-            label: const Text('Vegetarian'),
-            selected: vegOnly,
-            onSelected: (v) => setState(() => vegOnly = v),
-          ),
-        ),
-        if (model.products.isEmpty)
-          Padding(
-            padding: const EdgeInsets.all(30),
-            child: Text(
-              model.busy
-                  ? 'Loading menu…'
-                  : 'No menu is available. Refresh to retry.',
-            ),
-          ),
-        for (final p in products)
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Color(0xFFE0E4D8))),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        p.vegetarian ? '● VEG' : '● NON-VEG',
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: p.vegetarian
-                              ? pistaGreen
-                              : const Color(0xFF9C543B),
-                        ),
-                      ),
-                      const SizedBox(height: 7),
-                      Text(
-                        p.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 17,
-                        ),
-                      ),
-                      const SizedBox(height: 7),
-                      Text(
-                        rupees(p.pricePaise),
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 7),
-                      Text(
-                        p.description,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.black54,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 14),
-                SizedBox(
-                  width: 110,
-                  child: Column(
-                    children: [
-                      if (p.category == 'Biryani')
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.asset(
-                            'assets/biryani-cover.png',
-                            package: 'pista_ui',
-                            width: 110,
-                            height: 80,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      const SizedBox(height: 7),
-                      if (!p.available)
-                        const Text('Sold out')
-                      else
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            if ((model.cart[p.id] ?? 0) > 0) ...[
-                              IconButton(
-                                tooltip: 'Remove ${p.name}',
-                                visualDensity: VisualDensity.compact,
-                                onPressed: () => model.change(p.id, -1),
-                                icon: const Icon(Icons.remove, size: 17),
-                              ),
-                              Text('${model.cart[p.id]}'),
-                            ],
-                            IconButton(
-                              tooltip: 'Add ${p.name}',
-                              onPressed:
-                                  model.busy || model.pendingOrder != null
-                                  ? null
-                                  : () => model.change(p.id, 1),
-                              icon: const Icon(
-                                Icons.add_circle_outline,
-                                color: pistaGreen,
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        const SizedBox(height: 12),
-        const Text(
-          'Illustrative menu and prices. Restaurant approval pending.',
-          style: TextStyle(fontSize: 10, color: Colors.black54),
-        ),
-      ],
-    );
-  }
-
+  Future<void> _serverSettings() => showDialog<void>(
+    context: context,
+    builder: (context) => BetaServerDialog(
+      initialUrl: model.api.baseUrl,
+      onConnect: (url) async {
+        await model.api.configureBetaServer(url);
+        await BetaEndpoint.save(model.api.baseUrl);
+        model.resetForServer();
+        deliveryCodes.clear();
+        await model.refresh();
+      },
+    ),
+  );
   Widget _orders() => RefreshIndicator(
     onRefresh: model.refresh,
     child: ListView(
@@ -410,23 +265,123 @@ class _CustomerHomeState extends State<CustomerHome> {
         for (final order in model.orders)
           OrderTile(
             order,
-            action: order['paymentStatus'] == 'pending'
-                ? TextButton(
-                    onPressed: () {
-                      model.pendingOrder = order;
-                      _checkout();
-                    },
-                    child: const Text('Resume test payment'),
-                  )
-                : order['status'] == 'out_for_delivery'
-                ? TextButton(
-                    onPressed: () => _deliveryCode(order),
-                    child: const Text('Get delivery code'),
-                  )
-                : null,
+            action: _withOrderAgain(
+              order,
+              order['fulfilment'] == 'delivery' &&
+                      order['paymentStatus'] == 'paid'
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        FilledButton.icon(
+                          onPressed: () => Navigator.push<void>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => LiveTrackingPage(
+                                api: model.api,
+                                orderId: order['id'],
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(Icons.map_outlined),
+                          label: const Text('Track your order'),
+                        ),
+                        if (order['status'] == 'out_for_delivery')
+                          TextButton(
+                            onPressed: () => _deliveryCode(order),
+                            child: const Text('Get delivery code'),
+                          ),
+                      ],
+                    )
+                  : order['paymentStatus'] == 'pending'
+                  ? TextButton(
+                      onPressed: () {
+                        model.pendingOrder = order;
+                        _checkout();
+                      },
+                      child: const Text('Resume test payment'),
+                    )
+                  : order['status'] == 'out_for_delivery'
+                  ? TextButton(
+                      onPressed: () => _deliveryCode(order),
+                      child: const Text('Get delivery code'),
+                    )
+                  : null,
+            ),
           ),
       ],
     ),
+  );
+  Widget? _withOrderAgain(Map<String, dynamic> order, Widget? existing) {
+    if (order['paymentStatus'] != 'paid' || order['items'] is! List) {
+      return existing;
+    }
+    final again = OutlinedButton.icon(
+      onPressed: model.busy || model.checkoutLocked
+          ? null
+          : () => _orderAgain(order),
+      icon: const Icon(Icons.replay_rounded),
+      label: const Text('Order again'),
+    );
+    if (existing == null) return again;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [existing, again],
+    );
+  }
+
+  Future<void> _orderAgain(Map<String, dynamic> order) async {
+    if (model.cart.isNotEmpty) {
+      final replace = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Replace your current cart?'),
+          content: const Text(
+            'Ordering again will replace the items already in your cart.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Keep cart'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Replace'),
+            ),
+          ],
+        ),
+      );
+      if (replace != true || !mounted) return;
+    }
+    await model.refresh();
+    if (!mounted) return;
+    final message = model.reorder(order);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+    if (model.cart.isNotEmpty) setState(() => tab = 1);
+  }
+
+  Widget _offers() => ListView(
+    padding: const EdgeInsets.all(24),
+    children: [
+      const Text(
+        'Offers',
+        style: TextStyle(fontSize: 26, fontWeight: FontWeight.w600),
+      ),
+      const SizedBox(height: 16),
+      const Text(
+        'There are no offers or coupons available right now. Prices you see on the menu are the prices you pay.',
+        style: TextStyle(height: 1.7),
+      ),
+      const SizedBox(height: 20),
+      FilledButton(
+        onPressed: () => setState(() {
+          menuCategory = 'All';
+          tab = 1;
+        }),
+        child: const Text('Browse the menu'),
+      ),
+    ],
   );
   Widget _profile() => ListView(
     padding: const EdgeInsets.all(24),

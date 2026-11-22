@@ -31,6 +31,10 @@ import { Delivery } from "./delivery";
 import { DeliveryController } from "./delivery.controller";
 import { Accounts } from "./accounts/accounts";
 import { betaEnabled } from "./runtime";
+import { Tracking } from "./tracking";
+import { TrackingGateway } from "./tracking.gateway";
+import { TrackingController } from "./tracking.controller";
+import { MapsController, MapsSearch } from "./maps";
 import {
   AccountAccessController,
   AccountManagementController,
@@ -243,7 +247,18 @@ class ProtectedController {
     DeliveryController,
     AccountAccessController,
     AccountManagementController,
+    TrackingController,
+    MapsController,
   ],
-  providers: [Database, SessionGuard, Orders, Delivery, Accounts],
+  providers: [
+    Database,
+    SessionGuard,
+    Orders,
+    Delivery,
+    Accounts,
+    Tracking,
+    TrackingGateway,
+    MapsSearch,
+  ],
 })
 export class AppModule {}

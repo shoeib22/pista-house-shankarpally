@@ -9,6 +9,8 @@ dependencies:
     sdk: flutter
   pista_ui:
     path: ../../packages/mobile_ui
+  pista_tracking:
+    path: ../../packages/mobile_tracking
   pista_core:
     path: ../../packages/mobile_core
 dev_dependencies:
@@ -17,4 +19,3 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 flutter:
   uses-material-design: true
-

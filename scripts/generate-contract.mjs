@@ -15,6 +15,7 @@ function dartType(s) {
   if (s.$ref) return s.$ref.split("/").pop() + "Dto";
   if (s.type === "string") return "String";
   if (s.type === "integer") return "int";
+  if (s.type === "number") return "double";
   if (s.type === "boolean") return "bool";
   if (s.type === "array") return `List<${dartType(s.items)}>`;
   if (s.type === "object") return "Map<String, dynamic>";
@@ -22,6 +23,7 @@ function dartType(s) {
 }
 function decode(s, key) {
   const access = `json['${key}']`;
+  if (s.type === "number") return `(${access} as num).toDouble()`;
   if (s.$ref)
     return `${dartType(s)}.fromJson(Map<String, dynamic>.from(${access} as Map))`;
   if (s.type === "array") {

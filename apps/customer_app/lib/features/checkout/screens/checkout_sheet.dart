@@ -1,5 +1,6 @@
 import 'package:pista_ui/pista_ui.dart';
 import 'package:pista_core/pista_core.dart';
+import 'package:pista_tracking/pista_tracking.dart';
 
 class CheckoutSheet extends StatefulWidget {
   final CustomerModel model;
@@ -17,11 +18,13 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
       postal = TextEditingController(),
       landmark = TextEditingController();
   late String mode = widget.model.fulfilment;
+  LatLng? pin;
   @override
   void initState() {
     super.initState();
     final a = widget.model.deliveryAddress;
     if (a != null) {
+      pin = mapPoint(a);
       recipient.text = a['recipient'] ?? '';
       phone.text = a['phone'] ?? '';
       line1.text = a['line1'] ?? '';
@@ -157,6 +160,38 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                         landmark,
                         validator: (_) => null,
                       ),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.place_outlined),
+                        label: Text(
+                          pin == null
+                              ? 'Choose delivery pin on map'
+                              : 'Delivery pin selected · Change',
+                        ),
+                        onPressed: m.checkoutLocked || m.busy
+                            ? null
+                            : () async {
+                                final point = await Navigator.push<LatLng>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => AddressPinPage(
+                                      api: m.api,
+                                      initial: pin,
+                                      outlet: mapPoint(m.outletLocation),
+                                    ),
+                                  ),
+                                );
+                                if (point != null && mounted) {
+                                  setState(() => pin = point);
+                                }
+                              },
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'Choose the entrance for accurate tracking. PIN-code serviceability still applies.',
+                          style: TextStyle(fontSize: 11, color: Colors.black54),
+                        ),
+                      ),
                     ],
                     for (final p in m.products.where(
                       (p) => m.cart.containsKey(p.id),
@@ -243,6 +278,10 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                                           'city': city.text.trim(),
                                           'postalCode': postal.text.trim(),
                                           'landmark': landmark.text.trim(),
+                                          if (pin != null)
+                                            'latitude': pin!.latitude,
+                                          if (pin != null)
+                                            'longitude': pin!.longitude,
                                         }
                                       : null,
                                 );

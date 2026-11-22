@@ -87,6 +87,24 @@ class FakeApi extends PistaApi {
 }
 
 void main() {
+  test(
+    'changing the beta server drops the private address and uncertain checkout retry',
+    () async {
+      final api = FakeApi();
+      final model = CustomerModel(api);
+      model.cart['chicken-biryani'] = 1;
+      model.deliveryAddress = {'latitude': 17.45, 'longitude': 78.12};
+      await model.createOrder();
+      final oldKey = api.keys.single;
+      model.resetForServer();
+      expect(model.deliveryAddress, isNull);
+      model.cart['chicken-biryani'] = 1;
+      await model.createOrder();
+      expect(api.keys.last, isNot(oldKey));
+      expect(model.error, isNull);
+      model.dispose();
+    },
+  );
   testWidgets('delivery checkout validates an address before saving it', (
     tester,
   ) async {
@@ -139,7 +157,12 @@ void main() {
       );
       await tester.tap(find.byTooltip('Add Chicken Dum Biryani'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('View order →'));
+      await tester.scrollUntilVisible(
+        find.byTooltip('View cart').hitTestable(),
+        -180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.byTooltip('View cart'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Save order & review payment →'));
       await tester.pumpAndSettle();

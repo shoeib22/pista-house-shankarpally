@@ -4,6 +4,8 @@ Single-outlet ordering platform. Three Flutter mobile apps, an internal React em
 
 ## Current build
 
+The customer app now has the user-supplied heritage design direction, map-pin selection and area search, plus order-scoped live delivery tracking over authenticated WebSockets. Riders explicitly enable GPS sharing for an active picked-up delivery. See [maps and tracking](docs/live_tracking.md), [design notes](docs/design/heritage-redesign.md) and the current [verification status](docs/BUILD_STATUS.md).
+
 The connected development workflow supports pickup and delivery: sample catalogue → saved order and authoritative totals → explicit test payment → staff acceptance → kitchen preparation → pickup collection, or manual rider assignment → rider pickup → customer-code verified delivery. The owner app processes orders, assigns riders, handles returned deliveries and pauses new orders.
 
 All catalogue content is illustrative. No live restaurant data or actual payments. Public customer web ordering is outside scope.

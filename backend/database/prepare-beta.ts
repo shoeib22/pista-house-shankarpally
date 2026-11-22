@@ -31,6 +31,8 @@ async function main() {
       create: {
         id: "shankarpally",
         name: "Pista House Shankarpally · TEST ONLY",
+        latitude: 17.4538158,
+        longitude: 78.1410641,
       },
     });
     for (const product of sampleCatalogue)

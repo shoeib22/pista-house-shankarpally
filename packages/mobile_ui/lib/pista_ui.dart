@@ -9,17 +9,39 @@ export 'beta_server_dialog.dart';
 const pistaGreen = Color(0xFF17613B);
 const pistaIvory = Color(0xFFF7F3E9);
 ThemeData pistaTheme() => ThemeData(
+  fontFamily: 'packages/pista_ui/HouseSans',
+  fontFamilyFallback: const ['sans-serif'],
   colorScheme: ColorScheme.fromSeed(
     seedColor: pistaGreen,
     primary: pistaGreen,
-    surface: const Color(0xFFFFFEFA),
+    surface: const Color(0xFFFBF3E8),
   ),
-  scaffoldBackgroundColor: const Color(0xFFFFFEFA),
+  scaffoldBackgroundColor: const Color(0xFFFBF3E8),
   appBarTheme: const AppBarTheme(
-    backgroundColor: Color(0xFFFFFEFA),
+    backgroundColor: Color(0xFFFBF3E8),
     surfaceTintColor: Colors.transparent,
   ),
   dividerColor: const Color(0xFFE0E4D8),
+  navigationBarTheme: NavigationBarThemeData(
+    backgroundColor: const Color(0xFF073B29),
+    indicatorColor: const Color(0xFFEAD49C),
+    labelTextStyle: WidgetStateProperty.resolveWith(
+      (s) => TextStyle(
+        fontFamily: 'packages/pista_ui/HouseSans',
+        fontSize: 11,
+        color: s.contains(WidgetState.selected)
+            ? const Color(0xFFEAD49C)
+            : const Color(0xFFFFF6E7),
+      ),
+    ),
+    iconTheme: WidgetStateProperty.resolveWith(
+      (s) => IconThemeData(
+        color: s.contains(WidgetState.selected)
+            ? const Color(0xFF073B29)
+            : const Color(0xFFFFF6E7),
+      ),
+    ),
+  ),
   inputDecorationTheme: InputDecorationTheme(
     filled: true,
     fillColor: pistaIvory,

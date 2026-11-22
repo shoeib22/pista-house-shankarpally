@@ -9,6 +9,15 @@ dependencies:
     sdk: flutter
   flutter_svg: ^2.2.0
 flutter:
+  fonts:
+    - family: HouseSans
+      fonts:
+        - asset: assets/fonts/DMSans.ttf
+    - family: HouseSerif
+      fonts:
+        - asset: assets/fonts/CormorantGaramond.ttf
   assets:
     - assets/logo.svg
     - assets/biryani-cover.png
+    - assets/charminar-heritage.png
+    - assets/home-reference.png
