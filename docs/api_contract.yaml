@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Pista House Shankarpally API",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "description": "Single-outlet pickup, delivery and private beta API. Real menu, payments, phone authentication and service zones require launch configuration. Live GPS is scoped to active rider sharing leases; map selection does not approve a delivery zone."
   },
   "servers": [
@@ -3821,6 +3821,46 @@
         "responses": {
           "200": {
             "description": "Provider route or available:false; requires fresh GPS and a destination pin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "404": {
+            "description": "Order unavailable to this account"
+          }
+        }
+      }
+    },
+    "/orders/{id}/eta": {
+      "get": {
+        "operationId": "deliveryEta",
+        "summary": "Read a staged delivery estimate (preparation, assignment, pickup, road travel, handoff) as a labelled, non-traffic-aware range",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stage list with minutesLow/minutesHigh and confidence, or available:false; requires a delivery pin.",
             "content": {
               "application/json": {
                 "schema": {

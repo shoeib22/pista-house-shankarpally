@@ -84,28 +84,10 @@ class OrderDto {
       totalPaise = json['totalPaise'] as int,
       createdAt = json['createdAt'] as String,
       version = json['version'] as int,
-      items = (json['items'] as List)
-          .map(
-            (value) =>
-                OrderItemDto.fromJson(Map<String, dynamic>.from(value as Map)),
-          )
-          .toList(),
-      events = (json['events'] as List)
-          .map(
-            (value) =>
-                OrderEventDto.fromJson(Map<String, dynamic>.from(value as Map)),
-          )
-          .toList(),
-      assignments = (json['assignments'] as List)
-          .map(
-            (value) => AssignmentSummaryDto.fromJson(
-              Map<String, dynamic>.from(value as Map),
-            ),
-          )
-          .toList(),
-      deliveryAddress = json['deliveryAddress'] == null
-          ? null
-          : json['deliveryAddress'] as Map<String, dynamic>;
+      items = (json['items'] as List).map((value) => OrderItemDto.fromJson(Map<String, dynamic>.from(value as Map))).toList(),
+      events = (json['events'] as List).map((value) => OrderEventDto.fromJson(Map<String, dynamic>.from(value as Map))).toList(),
+      assignments = (json['assignments'] as List).map((value) => AssignmentSummaryDto.fromJson(Map<String, dynamic>.from(value as Map))).toList(),
+      deliveryAddress = json['deliveryAddress'] == null ? null : json['deliveryAddress'] as Map<String, dynamic>;
 }
 
 class CheckoutDto {
@@ -114,14 +96,8 @@ class CheckoutDto {
   final DeliveryAddressDto? deliveryAddress;
   CheckoutDto.fromJson(Map<String, dynamic> json)
     : fulfilment = json['fulfilment'] as String,
-      items = (json['items'] as List)
-          .map((value) => Map<String, dynamic>.from(value as Map))
-          .toList(),
-      deliveryAddress = json['deliveryAddress'] == null
-          ? null
-          : DeliveryAddressDto.fromJson(
-              Map<String, dynamic>.from(json['deliveryAddress'] as Map),
-            );
+      items = (json['items'] as List).map((value) => Map<String, dynamic>.from(value as Map)).toList(),
+      deliveryAddress = json['deliveryAddress'] == null ? null : DeliveryAddressDto.fromJson(Map<String, dynamic>.from(json['deliveryAddress'] as Map));
 }
 
 class ActionDto {
@@ -158,12 +134,8 @@ class DeliveryAddressDto {
       city = json['city'] as String,
       postalCode = json['postalCode'] as String,
       landmark = json['landmark'] == null ? null : json['landmark'] as String,
-      latitude = json['latitude'] == null
-          ? null
-          : (json['latitude'] as num).toDouble(),
-      longitude = json['longitude'] == null
-          ? null
-          : (json['longitude'] as num).toDouble();
+      latitude = json['latitude'] == null ? null : (json['latitude'] as num).toDouble(),
+      longitude = json['longitude'] == null ? null : (json['longitude'] as num).toDouble();
 }
 
 class AssignmentSummaryDto {
@@ -183,9 +155,7 @@ class AssignmentSummaryDto {
       version = json['version'] as int,
       createdAt = json['createdAt'] as String,
       rider = json['rider'] as Map<String, dynamic>,
-      failureReason = json['failureReason'] == null
-          ? null
-          : json['failureReason'] as String;
+      failureReason = json['failureReason'] == null ? null : json['failureReason'] as String;
 }
 
 class RiderDto {
@@ -217,13 +187,9 @@ class RiderTaskDto {
       version = json['version'] as int,
       createdAt = json['createdAt'] as String,
       rider = json['rider'] as Map<String, dynamic>,
-      failureReason = json['failureReason'] == null
-          ? null
-          : json['failureReason'] as String,
+      failureReason = json['failureReason'] == null ? null : json['failureReason'] as String,
       order = json['order'] as Map<String, dynamic>,
-      events = (json['events'] as List)
-          .map((value) => Map<String, dynamic>.from(value as Map))
-          .toList();
+      events = (json['events'] as List).map((value) => Map<String, dynamic>.from(value as Map)).toList();
 }
 
 class AccountSessionDto {
@@ -254,13 +220,9 @@ class TeamMemberDto {
       outletId = json['outletId'] as String,
       name = json['name'] as String,
       role = json['role'] as String,
-      disabledAt = json['disabledAt'] == null
-          ? null
-          : json['disabledAt'] as String,
+      disabledAt = json['disabledAt'] == null ? null : json['disabledAt'] as String,
       riderAvailable = json['riderAvailable'] as bool,
-      credential = json['credential'] == null
-          ? null
-          : json['credential'] as Map<String, dynamic>,
+      credential = json['credential'] == null ? null : json['credential'] as Map<String, dynamic>,
       developmentOnly = json['developmentOnly'] as bool;
 }
 
@@ -286,9 +248,7 @@ class InvitationDto {
       expiresAt = json['expiresAt'] as String,
       createdAt = json['createdAt'] as String,
       usedAt = json['usedAt'] == null ? null : json['usedAt'] as String,
-      revokedAt = json['revokedAt'] == null
-          ? null
-          : json['revokedAt'] as String,
+      revokedAt = json['revokedAt'] == null ? null : json['revokedAt'] as String,
       developmentOnly = json['developmentOnly'] as bool;
 }
 
@@ -325,9 +285,7 @@ class IssuedInvitationDto {
       expiresAt = json['expiresAt'] as String,
       createdAt = json['createdAt'] as String,
       usedAt = json['usedAt'] == null ? null : json['usedAt'] as String,
-      revokedAt = json['revokedAt'] == null
-          ? null
-          : json['revokedAt'] as String,
+      revokedAt = json['revokedAt'] == null ? null : json['revokedAt'] as String,
       token = json['token'] as String,
       developmentOnly = json['developmentOnly'] as bool;
 }

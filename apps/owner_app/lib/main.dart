@@ -2,15 +2,18 @@ import 'package:pista_ui/pista_ui.dart';
 import 'package:pista_core/pista_core.dart';
 import 'features/orders/widgets/order_actions.dart';
 
-Future<void> main()async{WidgetsFlutterBinding.ensureInitialized();await BetaEndpoint.restore();runApp(
-  MaterialApp(
-    title: 'Pista House Owner',
-    theme: pistaTheme(),
-    home: const OwnerHome(),
-    debugShowCheckedModeBanner: false,
-  ),
-);}
-
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await BetaEndpoint.restore();
+  runApp(
+    MaterialApp(
+      title: 'Pista House Owner',
+      theme: pistaTheme(),
+      home: const OwnerHome(),
+      debugShowCheckedModeBanner: false,
+    ),
+  );
+}
 
 class OwnerHome extends StatefulWidget {
   final PistaApi? api;
@@ -66,7 +69,29 @@ class _OwnerHomeState extends State<OwnerHome> {
     appBar: AppBar(
       title: const Text('Outlet overview'),
       actions: [
-if(const bool.fromEnvironment('BETA_TESTING'))IconButton(tooltip:'Beta server',icon:const Icon(Icons.dns_outlined),onPressed:()=>showDialog<void>(context:context,builder:(context)=>BetaServerDialog(initialUrl:api.baseUrl,onConnect:(url)async{await api.configureBetaServer(url);await BetaEndpoint.save(api.baseUrl);if(mounted)setState((){signedIn=false;orders=[];riders=[];error=null;});}))),
+        if (const bool.fromEnvironment('BETA_TESTING'))
+          IconButton(
+            tooltip: 'Beta server',
+            icon: const Icon(Icons.dns_outlined),
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (context) => BetaServerDialog(
+                initialUrl: api.baseUrl,
+                onConnect: (url) async {
+                  await api.configureBetaServer(url);
+                  await BetaEndpoint.save(api.baseUrl);
+                  if (mounted) {
+                    setState(() {
+                      signedIn = false;
+                      orders = [];
+                      riders = [];
+                      error = null;
+                    });
+                  }
+                },
+              ),
+            ),
+          ),
         if (signedIn)
           IconButton(
             tooltip: 'Your account',
@@ -227,6 +252,7 @@ if(const bool.fromEnvironment('BETA_TESTING'))IconButton(tooltip:'Beta server',i
             OrderTile(
               o,
               action: OwnerOrderActions(
+                api: api,
                 order: o,
                 riders: riders,
                 busy: busy,

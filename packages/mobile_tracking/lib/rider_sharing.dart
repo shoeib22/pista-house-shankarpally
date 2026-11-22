@@ -49,7 +49,7 @@ class _RiderLocationSharingState extends State<RiderLocationSharing> {
           ? AndroidSettings(
               accuracy: LocationAccuracy.high,
               distanceFilter: 10,
-              intervalDuration: const Duration(seconds: 5),
+              intervalDuration: const Duration(seconds: 4),
               foregroundNotificationConfig: const ForegroundNotificationConfig(
                 notificationTitle: 'Pista House delivery location',
                 notificationText:
@@ -122,7 +122,7 @@ class _RiderLocationSharingState extends State<RiderLocationSharing> {
         sending ||
         live?.connected != true ||
         (lastAttempt != null &&
-            DateTime.now().difference(lastAttempt!).inSeconds < 5))
+            DateTime.now().difference(lastAttempt!).inMilliseconds < 3800))
       return;
     if (p.accuracy > 100 ||
         DateTime.now().difference(p.timestamp).inSeconds.abs() > 30) {

@@ -118,6 +118,48 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+  testWidgets(
+    'owner can look up the rider only while a delivery is under way',
+    (tester) async {
+      Future<void> show(String orderStatus, String assignmentStatus) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: pistaTheme(),
+            home: Scaffold(
+              body: OwnerOrderActions(
+                api: PistaApi(),
+                order: {
+                  'id': 'order-1',
+                  'status': orderStatus,
+                  'fulfilment': 'delivery',
+                  'paymentStatus': 'paid',
+                  'version': 3,
+                  'assignments': [
+                    {
+                      'id': 'task-1',
+                      'isActive': true,
+                      'status': assignmentStatus,
+                      'version': 1,
+                      'rider': {'name': 'Sample rider'},
+                    },
+                  ],
+                },
+                riders: const [],
+                busy: false,
+                send: (_, _) async {},
+              ),
+            ),
+          ),
+        );
+      }
+
+      await show('out_for_delivery', 'picked_up');
+      expect(find.text('Where is the rider?'), findsOneWidget);
+      await show('ready', 'assigned');
+      expect(find.text('Where is the rider?'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
   testWidgets('owner assigns an online rider with the current order version', (
     tester,
   ) async {
@@ -128,6 +170,7 @@ void main() {
         theme: pistaTheme(),
         home: Scaffold(
           body: OwnerOrderActions(
+            api: PistaApi(),
             order: {
               'id': 'order-1',
               'status': 'ready',
@@ -166,6 +209,7 @@ void main() {
         theme: pistaTheme(),
         home: Scaffold(
           body: OwnerOrderActions(
+            api: PistaApi(),
             order: {
               'id': 'order-1',
               'status': 'delivery_failed',

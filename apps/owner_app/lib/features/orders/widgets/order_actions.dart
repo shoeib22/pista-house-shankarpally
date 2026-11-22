@@ -1,12 +1,16 @@
+import 'package:pista_core/pista_core.dart';
+import 'package:pista_tracking/pista_tracking.dart';
 import 'package:pista_ui/pista_ui.dart';
 
 class OwnerOrderActions extends StatefulWidget {
   final Map<String, dynamic> order;
   final List<Map<String, dynamic>> riders;
   final bool busy;
+  final PistaApi api;
   final Future<void> Function(String, Map<String, dynamic>) send;
   const OwnerOrderActions({
     super.key,
+    required this.api,
     required this.order,
     required this.riders,
     required this.busy,
@@ -100,6 +104,18 @@ class _OwnerOrderActionsState extends State<OwnerOrderActions> {
           Text(
             '${a['rider']['name']} · ${a['status']}',
             style: const TextStyle(color: pistaGreen),
+          ),
+        if (a?['status'] == 'picked_up' && o['status'] == 'out_for_delivery')
+          OutlinedButton.icon(
+            onPressed: () => Navigator.push<void>(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    RiderLocationPage(api: widget.api, orderId: o['id']),
+              ),
+            ),
+            icon: const Icon(Icons.location_searching),
+            label: const Text('Where is the rider?'),
           ),
         if (a?['status'] == 'assigned')
           TextButton(

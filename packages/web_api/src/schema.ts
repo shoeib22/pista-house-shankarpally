@@ -513,6 +513,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/orders/{id}/eta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a staged delivery estimate (preparation, assignment, pickup, road travel, handoff) as a labelled, non-traffic-aware range */
+        get: operations["deliveryEta"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/maps/search": {
         parameters: {
             query?: never;
@@ -3630,6 +3647,44 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Provider route or available:false; requires fresh GPS and a destination pin. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Session expired or revoked */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Order unavailable to this account */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    deliveryEta: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stage list with minutesLow/minutesHigh and confidence, or available:false; requires a delivery pin. */
             200: {
                 headers: {
                     [name: string]: unknown;

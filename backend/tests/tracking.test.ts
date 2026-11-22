@@ -390,3 +390,166 @@ test("stale and terminal delivery states never appear as a live rider", async ()
   await assert.rejects(() => tracking.publish(actors.rider, point()));
   assert.equal((await tracking.route(actors.owner, orderId)).available, false);
 });
+
+async function makeOrder(
+  status: string,
+  events: { action: string; at: number }[] = [],
+  assignment?: {
+    status: string;
+    at: number;
+    events: { action: string; at: number }[];
+  },
+) {
+  const key = randomUUID();
+  const order = await db.order.create({
+    data: {
+      outletId: outlet,
+      customerId: actors.customer.id,
+      idempotencyKey: key,
+      requestHash: key,
+      fulfilment: "delivery",
+      status,
+      paymentStatus: "paid",
+      subtotalPaise: 1000,
+      taxPaise: 0,
+      deliveryPaise: 0,
+      totalPaise: 1000,
+      deliveryAddress: { latitude: 17.46, longitude: 78.13 },
+      events: {
+        create: events.map((e) => ({
+          actorId: actors.owner.id,
+          action: e.action,
+          createdAt: new Date(e.at),
+        })),
+      },
+      ...(assignment
+        ? {
+            assignments: {
+              create: {
+                riderId: actors.rider.id,
+                status: assignment.status,
+                isActive: status !== "delivered",
+                createdAt: new Date(assignment.at),
+                events: {
+                  create: assignment.events.map((e) => ({
+                    actorId: actors.rider.id,
+                    action: e.action,
+                    createdAt: new Date(e.at),
+                  })),
+                },
+              },
+            },
+          }
+        : {}),
+    },
+  });
+  return order.id;
+}
+async function removeOrders(ids: string[]) {
+  await db.assignmentEvent.deleteMany({
+    where: { assignment: { orderId: { in: ids } } },
+  });
+  await db.deliveryAssignment.deleteMany({ where: { orderId: { in: ids } } });
+  await db.orderEvent.deleteMany({ where: { orderId: { in: ids } } });
+  await db.order.deleteMany({ where: { id: { in: ids } } });
+}
+
+test("delivery estimate is staged, labelled and ranged without inventing a route", async () => {
+  const saved = process.env.MAPS_ROUTING_URL;
+  process.env.MAPS_ROUTING_URL = "";
+  (tracking as any).etaHistory.clear();
+  await db.outlet.update({
+    where: { id: outlet },
+    data: { latitude: 17.4538, longitude: 78.1411 },
+  });
+  const now = Date.now();
+  const ids: string[] = [];
+  try {
+    const preparing = await makeOrder("preparing", [
+      { action: "accept", at: now - 5 * 60000 },
+    ]);
+    ids.push(preparing);
+    const eta = (await tracking.eta(actors.owner, preparing)) as any;
+    assert.equal(eta.available, true);
+    assert.deepEqual(
+      eta.stages.map((s: any) => s.key),
+      ["prep", "assign", "pickup", "travel", "handoff"],
+    );
+    assert.equal(eta.stages[0].minutes, 10);
+    assert.equal(eta.stages[0].source, "default");
+    assert.equal(eta.stages[3].source, "estimate");
+    assert.equal(eta.confidence, "rough");
+    assert.equal(eta.trafficAware, false);
+    assert.ok(eta.minutesLow < eta.totalMinutes);
+    assert.ok(eta.minutesHigh > eta.totalMinutes);
+    await assert.rejects(() => tracking.eta(actors.other, preparing));
+    await assert.rejects(() => tracking.eta(actors.kitchen, preparing));
+
+    const rolling = await makeOrder("out_for_delivery", [], {
+      status: "picked_up",
+      at: now,
+      events: [{ action: "picked_up", at: now }],
+    });
+    ids.push(rolling);
+    const onTheWay = (await tracking.eta(actors.customer, rolling)) as any;
+    assert.equal(onTheWay.available, true);
+    assert.deepEqual(
+      onTheWay.stages.map((s: any) => s.key),
+      ["travel", "handoff"],
+    );
+  } finally {
+    process.env.MAPS_ROUTING_URL = saved;
+    await removeOrders(ids);
+    await db.outlet.update({
+      where: { id: outlet },
+      data: { latitude: null, longitude: null },
+    });
+  }
+});
+
+test("delivery estimate uses this outlet's own history once it has five samples", async () => {
+  const saved = process.env.MAPS_ROUTING_URL;
+  process.env.MAPS_ROUTING_URL = "";
+  (tracking as any).etaHistory.clear();
+  await db.outlet.update({
+    where: { id: outlet },
+    data: { latitude: 17.4538, longitude: 78.1411 },
+  });
+  const day = Date.now() - 86400000;
+  const ids: string[] = [];
+  try {
+    for (let i = 0; i < 5; i++)
+      ids.push(
+        await makeOrder(
+          "delivered",
+          [
+            { action: "accept", at: day },
+            { action: "ready", at: day + 20 * 60000 },
+          ],
+          {
+            status: "delivered",
+            at: day + 22 * 60000,
+            events: [{ action: "picked_up", at: day + 30 * 60000 }],
+          },
+        ),
+      );
+    const fresh = await makeOrder("accepted", [
+      { action: "accept", at: Date.now() },
+    ]);
+    ids.push(fresh);
+    const eta = (await tracking.eta(actors.owner, fresh)) as any;
+    const prep = eta.stages.find((s: any) => s.key === "prep");
+    assert.equal(prep.source, "history");
+    assert.equal(prep.minutes, 20);
+    assert.equal(eta.stages.find((s: any) => s.key === "assign").minutes, 2);
+    assert.equal(eta.stages.find((s: any) => s.key === "pickup").minutes, 8);
+  } finally {
+    process.env.MAPS_ROUTING_URL = saved;
+    (tracking as any).etaHistory.clear();
+    await removeOrders(ids);
+    await db.outlet.update({
+      where: { id: outlet },
+      data: { latitude: null, longitude: null },
+    });
+  }
+});

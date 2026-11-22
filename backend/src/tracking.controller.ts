@@ -11,6 +11,9 @@ export class TrackingController {
   ) {
     return this.tracking.snapshot(req.actor, id);
   }
+  @Get(":id/eta") eta(@Req() req: AuthRequest, @Param("id") id: string) {
+    return this.tracking.eta(req.actor, id);
+  }
   @Get(":id/route") route(@Req() req: AuthRequest, @Param("id") id: string) {
     return this.tracking.route(req.actor, id);
   }

@@ -301,4 +301,246 @@ export class Tracking {
       };
     }
   }
+
+  private etaHistory = new Map<string, { until: number; value: unknown }>();
+  private etaRoutes = new Map<
+    string,
+    { until: number; value: number | null }
+  >();
+
+  /** Road travel time in minutes between two points, or null when unavailable. */
+  private async driveMinutes(
+    from: { latitude: number; longitude: number },
+    to: { latitude: number; longitude: number },
+  ): Promise<number | null> {
+    const endpoint = process.env.MAPS_ROUTING_URL;
+    if (!endpoint) return null;
+    const key = [from.latitude, from.longitude, to.latitude, to.longitude]
+      .map((n) => n.toFixed(3))
+      .join(",");
+    const cached = this.etaRoutes.get(key);
+    if (cached && cached.until > Date.now()) return cached.value;
+    let value: number | null = null;
+    try {
+      const url = new URL(
+        `/route/v1/driving/${from.longitude},${from.latitude};${to.longitude},${to.latitude}`,
+        endpoint,
+      );
+      url.searchParams.set("overview", "false");
+      const response = await fetch(url, { signal: AbortSignal.timeout(7000) });
+      const data = (await response.json()) as any;
+      const seconds = data.routes?.[0]?.duration;
+      if (
+        response.ok &&
+        data.code === "Ok" &&
+        typeof seconds === "number" &&
+        Number.isFinite(seconds) &&
+        seconds >= 0 &&
+        seconds < 86400
+      )
+        value = seconds / 60;
+    } catch {
+      value = null;
+    }
+    if (this.etaRoutes.size > 256) this.etaRoutes.clear();
+    this.etaRoutes.set(key, { until: Date.now() + 60000, value });
+    return value;
+  }
+
+  /** Median minutes this outlet took for each stage over its recent deliveries. */
+  private async stageHistory(outletId: string) {
+    const cached = this.etaHistory.get(outletId);
+    if (cached && cached.until > Date.now())
+      return cached.value as Record<"prep" | "assign" | "pickup", number[]>;
+    const recent = await this.db.order.findMany({
+      where: { outletId, fulfilment: "delivery", status: "delivered" },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      select: {
+        events: { select: { action: true, createdAt: true } },
+        assignments: {
+          select: {
+            createdAt: true,
+            events: { select: { action: true, createdAt: true } },
+          },
+        },
+      },
+    });
+    const history: Record<"prep" | "assign" | "pickup", number[]> = {
+      prep: [],
+      assign: [],
+      pickup: [],
+    };
+    const when = (list: { action: string; createdAt: Date }[], a: string) =>
+      list.find((e) => e.action === a)?.createdAt.getTime();
+    const keep = (target: number[], from?: number, to?: number) => {
+      if (from === undefined || to === undefined) return;
+      const minutes = (to - from) / 60000;
+      if (minutes >= 0.5 && minutes <= 120) target.push(minutes);
+    };
+    for (const order of recent) {
+      const accepted = when(order.events, "accept"),
+        ready = when(order.events, "ready");
+      keep(history.prep, accepted, ready);
+      const assignment = order.assignments.find((a) =>
+        a.events.some((e) => e.action === "picked_up"),
+      );
+      if (!assignment) continue;
+      const assigned = assignment.createdAt.getTime();
+      keep(history.assign, ready, assigned);
+      keep(history.pickup, assigned, when(assignment.events, "picked_up"));
+    }
+    this.etaHistory.set(outletId, {
+      until: Date.now() + 300000,
+      value: history,
+    });
+    return history;
+  }
+
+  /**
+   * A transparent, stage-based delivery estimate:
+   * preparation + rider assignment + pickup + road travel + handoff.
+   * Stage durations come from this outlet's own recent deliveries when there are
+   * at least five samples, otherwise from labelled defaults. It is not
+   * traffic-aware and is always returned as a range.
+   */
+  async eta(actor: Actor, id: string) {
+    const snapshot = await this.snapshot(actor, id);
+    if (
+      [
+        "delivered",
+        "collected",
+        "cancelled",
+        "rejected",
+        "delivery_failed",
+      ].includes(snapshot.status)
+    )
+      return { available: false, reason: "This delivery has finished" };
+    if (snapshot.paymentStatus !== "paid")
+      return { available: false, reason: "The estimate starts after payment" };
+    const order = await this.db.order.findFirst({
+      where: { id, outletId: actor.outletId },
+      select: {
+        events: { select: { action: true, createdAt: true } },
+        assignments: {
+          where: { isActive: true },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { createdAt: true, status: true },
+        },
+      },
+    });
+    if (!order) throw new NotFoundException("Order unavailable");
+    const history = await this.stageHistory(actor.outletId);
+    const median = (xs: number[]) => {
+      const sorted = [...xs].sort((a, b) => a - b),
+        mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2
+        ? sorted[mid]
+        : (sorted[mid - 1] + sorted[mid]) / 2;
+    };
+    const typical = (samples: number[], fallback: number) =>
+      samples.length >= 5
+        ? { minutes: median(samples), source: "history" as const }
+        : { minutes: fallback, source: "default" as const };
+    const now = Date.now(),
+      when = (a: string) =>
+        order.events.find((e) => e.action === a)?.createdAt.getTime();
+    const remaining = (total: number, since?: number) =>
+      since === undefined ? total : Math.max(1, total - (now - since) / 60000);
+    const assignment = order.assignments[0];
+    const accepted = when("accept"),
+      ready = when("ready");
+    const stages: {
+      key: string;
+      label: string;
+      minutes: number;
+      source: "history" | "default" | "route" | "estimate";
+    }[] = [];
+    const prep = typical(history.prep, 15),
+      assign = typical(history.assign, 4),
+      pickup = typical(history.pickup, 6);
+    const dispatched = snapshot.status === "out_for_delivery";
+    if (
+      ["awaiting_acceptance", "accepted", "preparing"].includes(snapshot.status)
+    )
+      stages.push({
+        key: "prep",
+        label: "Preparing your food",
+        minutes: remaining(prep.minutes, accepted),
+        source: prep.source,
+      });
+    if (!dispatched && !assignment)
+      stages.push({
+        key: "assign",
+        label: "Finding a delivery partner",
+        minutes: remaining(assign.minutes, ready),
+        source: assign.source,
+      });
+    if (!dispatched && (!assignment || assignment.status === "assigned"))
+      stages.push({
+        key: "pickup",
+        label: "Rider collecting your order",
+        minutes: remaining(pickup.minutes, assignment?.createdAt.getTime()),
+        source: pickup.source,
+      });
+    const destination = snapshot.destination as {
+      latitude: number;
+      longitude: number;
+    } | null;
+    const live = snapshot.fresh && snapshot.location ? snapshot.location : null;
+    const origin =
+      (live as { latitude: number; longitude: number } | null) ??
+      (snapshot.outlet as { latitude: number; longitude: number } | null);
+    if (!destination || !origin)
+      return {
+        available: false,
+        reason: "A delivery pin is needed to estimate travel",
+      };
+    let travel = await this.driveMinutes(origin, destination);
+    let source: "route" | "estimate" = "route";
+    if (travel === null) {
+      // No routing provider: straight-line distance at a modest urban speed.
+      const R = 6371,
+        rad = (d: number) => (d * Math.PI) / 180,
+        dLat = rad(destination.latitude - origin.latitude),
+        dLon = rad(destination.longitude - origin.longitude),
+        h =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(rad(origin.latitude)) *
+            Math.cos(rad(destination.latitude)) *
+            Math.sin(dLon / 2) ** 2;
+      const km = 2 * R * Math.asin(Math.sqrt(h)) * 1.4;
+      travel = Math.max(2, (km / 20) * 60);
+      source = "estimate";
+    }
+    stages.push({
+      key: "travel",
+      label: live ? "Rider on the way" : "Travel to you",
+      minutes: travel,
+      source,
+    });
+    stages.push({
+      key: "handoff",
+      label: "Handing over at your door",
+      minutes: 3,
+      source: "default",
+    });
+    const total = stages.reduce((sum, s) => sum + s.minutes, 0);
+    return {
+      available: true,
+      totalMinutes: Math.round(total),
+      minutesLow: Math.max(1, Math.round(total * 0.85)),
+      minutesHigh: Math.round(total * 1.3 + 2),
+      stages: stages.map((s) => ({ ...s, minutes: Math.round(s.minutes) })),
+      confidence: stages.every(
+        (s) =>
+          s.key === "handoff" || s.source === "history" || s.source === "route",
+      )
+        ? "history"
+        : "rough",
+      trafficAware: false,
+      calculatedAt: new Date().toISOString(),
+    };
+  }
 }

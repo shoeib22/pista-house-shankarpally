@@ -11,6 +11,8 @@ dependencies:
     path: ../../packages/mobile_ui
   pista_core:
     path: ../../packages/mobile_core
+  pista_tracking:
+    path: ../../packages/mobile_tracking
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -3,7 +3,11 @@ import 'package:pista_core/pista_core.dart';
 import 'package:pista_ui/pista_ui.dart';
 import 'map_widgets.dart';
 import 'tracking_connection.dart';
+import 'eta_card.dart';
 import 'package:flutter_map/flutter_map.dart';
+
+const _green = Color(0xFF073B29);
+const _cream = Color(0xFFFBF3E8);
 
 class LiveTrackingPage extends StatefulWidget {
   final PistaApi api;
@@ -13,14 +17,17 @@ class LiveTrackingPage extends StatefulWidget {
   State<LiveTrackingPage> createState() => _LiveTrackingPageState();
 }
 
-class _LiveTrackingPageState extends State<LiveTrackingPage> {
+class _LiveTrackingPageState extends State<LiveTrackingPage>
+    with SingleTickerProviderStateMixin {
   late final live = TrackingConnection(widget.api, orderId: widget.orderId);
+  late final glide = RiderGlide(this);
   final mapController = MapController();
   Map<String, dynamic>? route;
   Timer? timer;
   bool loadingRoute = false;
   bool fitted = false;
   DateTime? routeAt;
+  late final etaLoader = EtaLoader(widget.api, widget.orderId);
   @override
   void initState() {
     super.initState();
@@ -31,7 +38,19 @@ class _LiveTrackingPageState extends State<LiveTrackingPage> {
 
   void update() {
     if (!mounted) return;
+    glide.moveTo(
+      mapPoint(live.snapshot?['location']),
+      recordedAt: DateTime.tryParse(
+        '${live.snapshot?['location']?['recordedAt']}',
+      ),
+      animate: !MediaQuery.disableAnimationsOf(context),
+    );
     setState(() {});
+    if (live.connected && live.snapshot != null) {
+      etaLoader.refresh(() {
+        if (mounted) setState(() {});
+      });
+    }
     final s = live.snapshot;
     if (s?['fresh'] == true &&
         live.connected &&
@@ -62,7 +81,12 @@ class _LiveTrackingPageState extends State<LiveTrackingPage> {
             mapController.fitCamera(
               CameraFit.bounds(
                 bounds: LatLngBounds.fromPoints(all),
-                padding: const EdgeInsets.all(45),
+                padding: EdgeInsets.fromLTRB(
+                  45,
+                  90,
+                  45,
+                  MediaQuery.sizeOf(context).height * .48,
+                ),
               ),
             );
             fitted = true;
@@ -81,6 +105,7 @@ class _LiveTrackingPageState extends State<LiveTrackingPage> {
     timer?.cancel();
     live.removeListener(update);
     live.dispose();
+    glide.dispose();
     mapController.dispose();
     super.dispose();
   }
@@ -122,10 +147,14 @@ class _LiveTrackingPageState extends State<LiveTrackingPage> {
         ? 'Packed with care.'
         : 'A little patience. A lot of flavour.';
     return Scaffold(
-      appBar: AppBar(title: const Text('Track your order')),
-      body: Column(
+      backgroundColor: _cream,
+      appBar: AppBar(
+        title: const Text('Track your order'),
+        backgroundColor: _cream,
+      ),
+      body: Stack(
         children: [
-          Expanded(
+          Positioned.fill(
             child: destination == null && rider == null && outlet == null
                 ? Container(
                     color: pistaIvory,
@@ -140,30 +169,87 @@ class _LiveTrackingPageState extends State<LiveTrackingPage> {
                   )
                 : Stack(
                     children: [
-                      DeliveryMap(
-                        controller: mapController,
-                        center: destination ?? rider ?? outlet!,
-                        route: points,
-                        markers: [
-                          if (outlet != null)
-                            mapMarker(
-                              outlet,
-                              Icons.storefront_outlined,
-                              const Color(0xFFB08844),
+                      ListenableBuilder(
+                        listenable: glide,
+                        builder: (context, _) {
+                          final shown = glide.value ?? rider;
+                          return DeliveryMap(
+                            controller: mapController,
+                            center: destination ?? rider ?? outlet!,
+                            route: points,
+                            markers: [
+                              if (outlet != null)
+                                mapMarker(
+                                  outlet,
+                                  Icons.storefront_outlined,
+                                  const Color(0xFFB69B60),
+                                ),
+                              if (destination != null)
+                                mapMarker(
+                                  destination,
+                                  Icons.home_rounded,
+                                  _green,
+                                ),
+                              if (shown != null && !terminal)
+                                mapMarker(
+                                  shown,
+                                  Icons.delivery_dining,
+                                  fresh ? const Color(0xFFB69B60) : Colors.grey,
+                                  pulse: fresh,
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                      Positioned(
+                        left: 16,
+                        top: 16,
+                        child: Material(
+                          elevation: 4,
+                          shadowColor: const Color(0x33073B29),
+                          color: const Color(0xFFFDF8F0),
+                          borderRadius: BorderRadius.circular(24),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 9,
                             ),
-                          if (destination != null)
-                            mapMarker(
-                              destination,
-                              Icons.home_rounded,
-                              pistaGreen,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  terminal
+                                      ? Icons.check_circle_outline
+                                      : fresh
+                                      ? Icons.sensors
+                                      : Icons.schedule,
+                                  size: 18,
+                                  color: fresh || terminal
+                                      ? _green
+                                      : Colors.brown,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  terminal
+                                      ? status.replaceAll('_', ' ')
+                                      : etaLoader.available
+                                      ? etaRange(etaLoader.value!)
+                                      : hasRoute
+                                      ? '${((route!['durationSeconds'] as num) / 60).ceil()} min · ${((route!['distanceMetres'] as num) / 1000).toStringAsFixed(1)} km'
+                                      : fresh
+                                      ? 'Live'
+                                      : live.connected
+                                      ? 'Waiting for rider'
+                                      : 'Reconnecting…',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: _green,
+                                  ),
+                                ),
+                              ],
                             ),
-                          if (rider != null && !terminal)
-                            mapMarker(
-                              rider,
-                              Icons.delivery_dining,
-                              fresh ? const Color(0xFFB08844) : Colors.grey,
-                            ),
-                        ],
+                          ),
+                        ),
                       ),
                       Positioned(
                         right: 16,
@@ -182,7 +268,12 @@ class _LiveTrackingPageState extends State<LiveTrackingPage> {
                               mapController.fitCamera(
                                 CameraFit.bounds(
                                   bounds: LatLngBounds.fromPoints(markers),
-                                  padding: const EdgeInsets.all(55),
+                                  padding: EdgeInsets.fromLTRB(
+                                    55,
+                                    90,
+                                    55,
+                                    MediaQuery.sizeOf(context).height * .48,
+                                  ),
                                 ),
                               );
                             } else if (markers.isNotEmpty) {
@@ -194,25 +285,45 @@ class _LiveTrackingPageState extends State<LiveTrackingPage> {
                     ],
                   ),
           ),
-          ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(context).height * .52,
-            ),
-            child: SingleChildScrollView(
+          DraggableScrollableSheet(
+            initialChildSize: .44,
+            minChildSize: .2,
+            maxChildSize: .92,
+            snap: true,
+            builder: (context, scroll) => SingleChildScrollView(
+              controller: scroll,
               child: SafeArea(
                 top: false,
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(22),
                   decoration: const BoxDecoration(
-                    color: pistaIvory,
+                    color: _cream,
                     borderRadius: BorderRadius.vertical(
                       top: Radius.circular(28),
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0x28073B29),
+                        blurRadius: 20,
+                        offset: Offset(0, -4),
+                      ),
+                    ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Center(
+                        child: Container(
+                          width: 42,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD5CCBA),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
                       Text(
                         heading,
                         style: const TextStyle(
@@ -254,7 +365,12 @@ class _LiveTrackingPageState extends State<LiveTrackingPage> {
                             '${s!['rider']['name']} · Your delivery partner',
                           ),
                         ),
-                      if (hasRoute)
+                      if (etaLoader.available && !terminal)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: EtaCard(eta: etaLoader.value!),
+                        ),
+                      if (hasRoute && !etaLoader.available)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
@@ -262,7 +378,7 @@ class _LiveTrackingPageState extends State<LiveTrackingPage> {
                             style: const TextStyle(height: 1.5),
                           ),
                         ),
-                      if (!hasRoute && !terminal)
+                      if (!hasRoute && !terminal && !etaLoader.available)
                         const Padding(
                           padding: EdgeInsets.only(top: 10),
                           child: Text(
@@ -270,6 +386,17 @@ class _LiveTrackingPageState extends State<LiveTrackingPage> {
                             style: TextStyle(
                               color: Colors.black54,
                               fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      if (fresh && !terminal)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Between GPS updates the marker\u2019s movement is smoothed and estimated.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.black54,
                             ),
                           ),
                         ),
