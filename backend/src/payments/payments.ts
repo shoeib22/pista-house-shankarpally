@@ -661,7 +661,17 @@ export class Payments implements OnModuleInit, OnModuleDestroy {
     const existing = await this.db.refund.findUnique({
       where: { orderId_idempotencyKey: { orderId, idempotencyKey: idem } },
     });
-    if (existing) return this.refundView(existing);
+    if (existing) {
+      // The same key may only repeat the same refund (a safe retry).
+      if (
+        (amountPaise !== undefined && existing.amountPaise !== amountPaise) ||
+        existing.reason !== reason
+      )
+        throw new ConflictException(
+          "This Idempotency-Key was already used for a different refund",
+        );
+      return this.refundView(existing);
+    }
     const made = await this.db.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
         where: { id: orderId, outletId: actor.outletId },

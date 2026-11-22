@@ -41,6 +41,8 @@ model User {
   email               String?
   emailVerifiedAt     DateTime?
   emailCodes          EmailCode[]
+  supportTickets      SupportTicket[]  @relation("TicketCustomer")
+  assignedTickets     SupportTicket[]  @relation("TicketAssignee")
 }
 
 model Session {
@@ -357,4 +359,52 @@ model WebhookEvent {
   type        String
   receivedAt  DateTime  @default(now())
   processedAt DateTime?
+}
+
+/// A customer's help request, optionally about one of their orders. The thread
+/// is a conversation with the outlet; staff can also leave internal notes the
+/// customer never sees.
+model SupportTicket {
+  id                    String           @id @default(uuid())
+  number                Int              @unique @default(autoincrement())
+  outletId              String
+  customerId            String
+  customer              User             @relation("TicketCustomer", fields: [customerId], references: [id])
+  orderId               String?
+  category              String
+  subject               String
+  /// open (needs staff) | pending_customer | resolved | closed
+  status                String           @default("open")
+  priority              String           @default("normal")
+  assignedToId          String?
+  assignedTo            User?            @relation("TicketAssignee", fields: [assignedToId], references: [id])
+  rating                Int?
+  ratingComment         String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  firstResponseAt       DateTime?
+  resolvedAt            DateTime?
+  lastCustomerMessageAt DateTime         @default(now())
+  lastStaffMessageAt    DateTime?
+  customerReadAt        DateTime?
+  messages              SupportMessage[]
+
+  @@index([outletId, status, updatedAt])
+  @@index([customerId, updatedAt])
+  @@index([orderId])
+}
+
+model SupportMessage {
+  id         String        @id @default(uuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id])
+  authorId   String
+  /// customer | staff | system
+  authorRole String
+  /// Internal notes are for staff only.
+  internal   Boolean       @default(false)
+  body       String
+  createdAt  DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
 }

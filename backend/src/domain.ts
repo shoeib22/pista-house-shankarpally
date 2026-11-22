@@ -15,7 +15,8 @@ export type Permission =
   | "reports:read"
   | "delivery:dispatch"
   | "users:manage"
-  | "payments:refund";
+  | "payments:refund"
+  | "support:manage";
 const permissions: Record<Role, Permission[]> = {
   customer: [],
   rider: [],
@@ -28,6 +29,7 @@ const permissions: Record<Role, Permission[]> = {
     "delivery:dispatch",
     "menu:write",
     "audit:read",
+    "support:manage",
   ],
   owner: [
     "orders:read",
@@ -41,6 +43,7 @@ const permissions: Record<Role, Permission[]> = {
     "reports:read",
     "users:manage",
     "payments:refund",
+    "support:manage",
   ],
 };
 export function permit(role: string, permission: Permission) {

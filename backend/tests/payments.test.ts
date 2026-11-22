@@ -851,6 +851,18 @@ test("owner refunds: validated, idempotent, never over-refunded, and failures ar
     { "idempotency-key": "refund-key-0002" },
   );
   assert.equal(replay.json.id, partial.json.id, "same key, same refund");
+  const reused = await call(
+    "POST",
+    url,
+    "owner",
+    { reason: "late order", amountPaise: 9000 },
+    { "idempotency-key": "refund-key-0002" },
+  );
+  assert.equal(
+    reused.status,
+    409,
+    "a key cannot be reused for a different amount",
+  );
   assert.equal(
     rz.refundCalls.filter((c) => c.payment === "pay_r").length,
     1,

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'features/checkout/screens/checkout_sheet.dart';
 import 'features/auth/auth_page.dart';
 import 'features/auth/email_pages.dart';
+import 'features/support/support_pages.dart';
 import 'features/account/saved_addresses_page.dart';
 import 'package:pista_ui/pista_ui.dart';
 import 'package:pista_core/pista_core.dart';
@@ -214,7 +215,10 @@ class _CustomerHomeState extends State<CustomerHome> {
           3 => 3,
           _ => 0,
         },
-        onSelected: (index) => setState(() => tab = const [0, 2, 4, 3][index]),
+        onSelected: (index) {
+          setState(() => tab = const [0, 2, 4, 3][index]);
+          if (index == 3) _loadSupportUnread();
+        },
       ),
       bottomSheet: model.quantity > 0 && tab == 1
           ? SafeArea(
@@ -314,9 +318,12 @@ class _CustomerHomeState extends State<CustomerHome> {
     ),
   );
   Widget? _withOrderAgain(Map<String, dynamic> order, Widget? existing) {
-    if (order['paymentStatus'] != 'paid' || order['items'] is! List) {
-      return existing;
-    }
+    final canAgain = order['paymentStatus'] == 'paid' && order['items'] is List;
+    final help = TextButton.icon(
+      onPressed: model.api.token == null ? null : () => _askForHelp(order),
+      icon: const Icon(Icons.support_agent_outlined, size: 18),
+      label: const Text('Get help with this order'),
+    );
     final again = OutlinedButton.icon(
       onPressed: model.busy || model.checkoutLocked
           ? null
@@ -324,11 +331,45 @@ class _CustomerHomeState extends State<CustomerHome> {
       icon: const Icon(Icons.replay_rounded),
       label: const Text('Order again'),
     );
-    if (existing == null) return again;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [existing, again],
+      children: [?existing, if (canAgain) again, help],
     );
+  }
+
+  Future<void> _askForHelp(Map<String, dynamic> order) async {
+    final id = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            NewRequestPage(api: model.api, orders: model.orders, order: order),
+      ),
+    );
+    if (id != null && mounted) {
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TicketPage(api: model.api, ticketId: id),
+        ),
+      );
+      _loadSupportUnread();
+    }
+  }
+
+  int supportUnread = 0;
+  Future<void> _loadSupportUnread() async {
+    if (model.api.token == null) return;
+    try {
+      final tickets = await model.api.request('/support/tickets') as List;
+      if (mounted) {
+        setState(
+          () =>
+              supportUnread = tickets.where((t) => t['unread'] == true).length,
+        );
+      }
+    } catch (_) {
+      // Support is optional; a failure here must not disturb the account tab.
+    }
   }
 
   Future<void> _orderAgain(Map<String, dynamic> order) async {
@@ -508,6 +549,34 @@ class _CustomerHomeState extends State<CustomerHome> {
                 builder: (_) => SavedAddressesPage(model: model),
               ),
             ),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Badge(
+              isLabelVisible: supportUnread > 0,
+              label: Text('$supportUnread'),
+              child: const Icon(
+                Icons.support_agent_outlined,
+                color: heritageGreen,
+              ),
+            ),
+            title: const Text('Help & support'),
+            subtitle: Text(
+              supportUnread > 0
+                  ? '$supportUnread new ${supportUnread == 1 ? 'reply' : 'replies'}'
+                  : 'Ask about an order or get answers',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () async {
+              await Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      SupportPage(api: model.api, orders: model.orders),
+                ),
+              );
+              _loadSupportUnread();
+            },
           ),
           const Divider(),
           const SizedBox(height: 8),

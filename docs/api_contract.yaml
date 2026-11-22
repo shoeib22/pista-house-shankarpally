@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Pista House Shankarpally API",
-    "version": "0.9.0",
+    "version": "0.10.0",
     "description": "Single-outlet pickup, delivery and private beta API. Real menu, payments, phone authentication and service zones require launch configuration. Live GPS is scoped to active rider sharing leases; map selection does not approve a delivery zone."
   },
   "servers": [
@@ -5018,6 +5018,486 @@
           },
           "403": {
             "description": "Owner only"
+          }
+        }
+      }
+    },
+    "/support/tickets": {
+      "post": {
+        "operationId": "createSupportRequest",
+        "summary": "Customer opens a help request, optionally about one of their own orders (max 3 open, 5 new per hour)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The new request with its first message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "404": {
+            "description": "Order not found"
+          },
+          "409": {
+            "description": "Too many open requests"
+          },
+          "429": {
+            "description": "Too many new requests"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listSupportRequests",
+        "summary": "The customer's own requests, with unread-reply flags",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Requests.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "403": {
+            "description": "Customer access required"
+          }
+        }
+      }
+    },
+    "/support/tickets/{id}": {
+      "get": {
+        "operationId": "getSupportRequest",
+        "summary": "One request's conversation (internal staff notes are never included); marks replies as read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request and its public messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "404": {
+            "description": "Request not found"
+          }
+        }
+      }
+    },
+    "/support/tickets/{id}/messages": {
+      "post": {
+        "operationId": "replyToSupportRequest",
+        "summary": "Customer replies; reopens a resolved request for 7 days",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "409": {
+            "description": "Closed or resolved too long ago"
+          },
+          "429": {
+            "description": "Sending too fast"
+          }
+        }
+      }
+    },
+    "/support/tickets/{id}/close": {
+      "post": {
+        "operationId": "closeSupportRequest",
+        "summary": "Customer closes their request",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The updated request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          }
+        }
+      }
+    },
+    "/support/tickets/{id}/rating": {
+      "post": {
+        "operationId": "rateSupportRequest",
+        "summary": "Customer rates a finished request 1-5, once",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "409": {
+            "description": "Not finished, or already rated"
+          }
+        }
+      }
+    },
+    "/support/inbox": {
+      "get": {
+        "operationId": "supportInbox",
+        "summary": "Staff queue: filter needs_reply|waiting|finished|all, mine=true, search; overdue and high priority first",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mine",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Requests with waiting time and overdue flag.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "403": {
+            "description": "Owner or counter only"
+          }
+        }
+      }
+    },
+    "/support/inbox/{id}": {
+      "get": {
+        "operationId": "supportRequestDetail",
+        "summary": "Staff view: full thread including private notes, the customer and the order",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "404": {
+            "description": "Request not found"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateSupportRequest",
+        "summary": "Assign, set priority or change status; leaves a private trail",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated detail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "400": {
+            "description": "Invalid change"
+          }
+        }
+      }
+    },
+    "/support/inbox/{id}/reply": {
+      "post": {
+        "operationId": "staffReplyToSupportRequest",
+        "summary": "Reply to the customer (sets pending_customer or resolved) or add a private note",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated detail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "409": {
+            "description": "Closed: reopen before replying to the customer"
+          }
+        }
+      }
+    },
+    "/support/stats": {
+      "get": {
+        "operationId": "supportStats",
+        "summary": "Queue size, overdue, resolved today, average first-reply time and customer rating",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Statistics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
           }
         }
       }

@@ -1,6 +1,7 @@
 import 'package:pista_core/pista_core.dart';
 import 'package:pista_tracking/pista_tracking.dart';
 import 'package:pista_ui/pista_ui.dart';
+import '../../payments/refund_page.dart';
 
 class OwnerOrderActions extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -104,6 +105,19 @@ class _OwnerOrderActionsState extends State<OwnerOrderActions> {
           Text(
             '${a['rider']['name']} · ${a['status']}',
             style: const TextStyle(color: pistaGreen),
+          ),
+        if (['paid', 'refunded'].contains(o['paymentStatus']))
+          TextButton.icon(
+            onPressed: () => Navigator.push<void>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RefundPage(api: widget.api, order: o),
+              ),
+            ),
+            icon: const Icon(Icons.currency_rupee, size: 17),
+            label: Text(
+              o['paymentStatus'] == 'refunded' ? 'Refund details' : 'Refund',
+            ),
           ),
         if (a?['status'] == 'picked_up' && o['status'] == 'out_for_delivery')
           OutlinedButton.icon(

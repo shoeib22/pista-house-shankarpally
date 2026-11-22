@@ -1,6 +1,7 @@
 import 'package:pista_ui/pista_ui.dart';
 import 'package:pista_core/pista_core.dart';
 import 'features/orders/widgets/order_actions.dart';
+import 'features/support/support_pages.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +29,7 @@ class _OwnerHomeState extends State<OwnerHome> {
   List<Map<String, dynamic>> riders = [];
   bool busy = false, paused = false, autoDispatch = false, signedIn = false;
   Map<String, dynamic>? dispatch;
+  int supportOpen = 0, supportOverdue = 0;
   String? error;
   Future<void> run(Future<void> Function() action) async {
     setState(() {
@@ -53,6 +55,13 @@ class _OwnerHomeState extends State<OwnerHome> {
     orders = (await api.request('/orders') as List)
         .map((o) => Map<String, dynamic>.from(o))
         .toList();
+    try {
+      final st = await api.request('/support/stats');
+      supportOpen = (st['needsReply'] as num).toInt();
+      supportOverdue = (st['overdue'] as num).toInt();
+    } catch (_) {
+      // An older server has no support desk; the rest of the app still works.
+    }
     final outlet = await api.request('/outlet');
     paused = outlet['paused'];
     autoDispatch = outlet['autoDispatch'] == true;
@@ -176,6 +185,23 @@ class _OwnerHomeState extends State<OwnerHome> {
                       });
                     }
                   },
+          ),
+        if (signedIn)
+          IconButton(
+            tooltip: 'Customer support',
+            icon: Badge(
+              isLabelVisible: supportOpen > 0,
+              label: Text('$supportOpen'),
+              backgroundColor: supportOverdue > 0 ? Colors.deepOrange : null,
+              child: const Icon(Icons.support_agent_outlined),
+            ),
+            onPressed: () async {
+              await Navigator.push<void>(
+                context,
+                MaterialPageRoute(builder: (_) => SupportInboxPage(api: api)),
+              );
+              if (mounted && signedIn) run(refresh);
+            },
           ),
         IconButton(
           tooltip: 'Refresh',
