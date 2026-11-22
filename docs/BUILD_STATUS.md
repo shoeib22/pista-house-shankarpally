@@ -43,7 +43,7 @@ Physical iPhone/Android checks are still required for actual GPS accuracy, lock-
 
 OpenStreetMap tiles, the Photon demo search endpoint and the OSRM demo router are for moderate beta testing. Production needs approved map/search/routing providers, their usage/attribution/privacy setup and monitoring. ETA is road travel time without traffic or preparation time.
 
-Other remaining gates include customer phone authentication, real gateway/refunds and reconciliation, restaurant-approved menu/taxes/zones/policies, variants/add-ons, saved address books, rewards/coupons/favourites/reorder, push/SMS workers, expanded owner reporting, durable mobile sessions/retries, production packaging/TLS, backups/restores, dependency advisory review, security/load testing and store release readiness. No COD, route optimisation across multiple stops, order batching, public customer storefront or Petpooja integration was added. Optional owner-controlled auto-assignment of riders was later added (off by default; see `docs/auto_dispatch.md`).
+Other remaining gates include customer phone verification (SMS/OTP) and passphrase reset, real gateway/refunds and reconciliation, restaurant-approved menu/taxes/zones/policies, variants/add-ons, rewards/coupons/server-synced favourites, push/SMS workers, expanded owner reporting, durable mobile sessions/retries, production packaging/TLS, backups/restores, dependency advisory review, security/load testing and store release readiness. No COD, route optimisation across multiple stops, order batching, public customer storefront or Petpooja integration was added. Optional owner-controlled auto-assignment of riders was later added (off by default; see `docs/auto_dispatch.md`).
 
 ## Distribution history
 

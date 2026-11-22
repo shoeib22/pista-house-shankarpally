@@ -14,6 +14,9 @@ class PistaApi {
   String baseUrl;
   static String betaServerOverride = '';
   String? token;
+
+  /// Display details of the signed-in account, from the last sign-in.
+  String? userName, userHandle;
   final http.Client _client;
   PistaApi({String? baseUrl, http.Client? client})
     : baseUrl =
@@ -80,7 +83,25 @@ class PistaApi {
       method: 'POST',
       body: {'handle': handle, 'password': password, 'audience': audience},
     );
+    _remember(data);
+    userHandle ??= handle;
+  }
+
+  /// Customer self-registration with a mobile number and a passphrase. The
+  /// number is not verified yet. Signs the new customer in.
+  Future<void> register(String name, String phone, String password) async {
+    final data = await request(
+      '/auth/register',
+      method: 'POST',
+      body: {'name': name, 'phone': phone, 'password': password},
+    );
+    _remember(data);
+  }
+
+  void _remember(dynamic data) {
     token = data['token'] as String;
+    userName = data['user'] is Map ? '${data['user']['name']}' : null;
+    userHandle = data['handle'] == null ? null : '${data['handle']}';
   }
 
   Future<void> acceptInvitation(
@@ -101,6 +122,7 @@ class PistaApi {
       if (token != null) await request('/session', method: 'DELETE');
     } finally {
       token = null;
+      userName = userHandle = null;
     }
   }
 

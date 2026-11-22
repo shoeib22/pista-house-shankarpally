@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pista_core/pista_core.dart';
 import 'package:pista_ui/pista_ui.dart';
-import 'package:pista_customer/features/checkout/screens/beta_access_sheet.dart';
+import 'package:pista_customer/features/auth/auth_page.dart';
 
 class BetaApi extends PistaApi {
   final paths = <String>[];
@@ -99,11 +99,9 @@ void main() {
           home: Builder(
             builder: (context) => Scaffold(
               body: FilledButton(
-                onPressed: () => showModalBottomSheet<void>(
-                  context: context,
-                  isScrollControlled: true,
-                  useSafeArea: true,
-                  builder: (context) => BetaAccessSheet(api: api),
+                onPressed: () => Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(builder: (_) => CustomerAuthPage(api: api)),
                 ),
                 child: const Text('Open customer beta sign-in'),
               ),

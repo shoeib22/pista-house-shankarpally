@@ -19,6 +19,8 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
       landmark = TextEditingController();
   late String mode = widget.model.fulfilment;
   LatLng? pin;
+  String? selectedId, selectedLabel;
+  bool saveThis = true;
   @override
   void initState() {
     super.initState();
@@ -32,10 +34,60 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
       postal.text = a['postalCode'] ?? '';
       landmark.text = a['landmark'] ?? '';
     }
+    if (widget.model.api.token != null) {
+      widget.model.addresses.addListener(_addressesChanged);
+      widget.model.addresses.load().then((_) => _prefillDefault());
+    }
+  }
+
+  void _addressesChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Fills the form from the default saved address, but never over something
+  /// the customer already typed or an order that is already saved.
+  void _prefillDefault() {
+    final m = widget.model;
+    final a = m.addresses.defaultAddress;
+    if (!mounted ||
+        a == null ||
+        m.pendingOrder != null ||
+        m.deliveryAddress != null ||
+        line1.text.isNotEmpty ||
+        recipient.text.isNotEmpty) {
+      return;
+    }
+    setState(() => _apply(a));
+  }
+
+  void _apply(Map<String, dynamic> a) {
+    selectedId = a['id'];
+    selectedLabel = a['label'];
+    recipient.text = '${a['recipient'] ?? ''}';
+    phone.text = '${a['phone'] ?? ''}';
+    line1.text = '${a['line1'] ?? ''}';
+    city.text = '${a['city'] ?? ''}';
+    postal.text = '${a['postalCode'] ?? ''}';
+    landmark.text = '${a['landmark'] ?? ''}';
+    pin = mapPoint(a);
+  }
+
+  Future<void> _saveAddress(Map<String, dynamic> address) async {
+    try {
+      await widget.model.addresses.save(
+        address,
+        label:
+            selectedLabel ??
+            (widget.model.addresses.items.isEmpty ? 'Home' : 'Other'),
+      );
+    } catch (_) {
+      // The order is already saved; a failed address save must not block it.
+    }
   }
 
   @override
   void dispose() {
+    widget.model.addresses.removeListener(_addressesChanged);
     for (final c in [recipient, phone, line1, city, postal, landmark]) {
       c.dispose();
     }
@@ -113,6 +165,34 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                           : (values) => setState(() => mode = values.first),
                     ),
                     const SizedBox(height: 18),
+                    if (mode == 'delivery' &&
+                        widget.model.addresses.items.isNotEmpty) ...[
+                      const Text(
+                        'Deliver to a saved address',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          for (final a in widget.model.addresses.items)
+                            ChoiceChip(
+                              avatar: Icon(switch (a['label']) {
+                                'Home' => Icons.home_outlined,
+                                'Work' => Icons.work_outline,
+                                _ => Icons.place_outlined,
+                              }, size: 18),
+                              label: Text('${a['label']}'),
+                              selected: selectedId == a['id'],
+                              onSelected: m.checkoutLocked || m.busy
+                                  ? null
+                                  : (_) => setState(() => _apply(a)),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                    ],
                     if (mode == 'delivery') ...[
                       const Text(
                         'Development delivery zone: 000000. This sample postcode is not a real service area.',
@@ -192,6 +272,16 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                           style: TextStyle(fontSize: 11, color: Colors.black54),
                         ),
                       ),
+                      if (m.api.token != null)
+                        CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: const Text('Save this address for next time'),
+                          value: saveThis,
+                          onChanged: m.checkoutLocked || m.busy
+                              ? null
+                              : (v) => setState(() => saveThis = v ?? false),
+                        ),
                     ],
                     for (final p in m.products.where(
                       (p) => m.cart.containsKey(p.id),
@@ -268,24 +358,28 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                           : () async {
                               if (m.pendingOrder == null) {
                                 if (!form.currentState!.validate()) return;
-                                m.configureCheckout(
-                                  mode,
-                                  mode == 'delivery'
-                                      ? {
-                                          'recipient': recipient.text.trim(),
-                                          'phone': phone.text.trim(),
-                                          'line1': line1.text.trim(),
-                                          'city': city.text.trim(),
-                                          'postalCode': postal.text.trim(),
-                                          'landmark': landmark.text.trim(),
-                                          if (pin != null)
-                                            'latitude': pin!.latitude,
-                                          if (pin != null)
-                                            'longitude': pin!.longitude,
-                                        }
-                                      : null,
-                                );
+                                final address = mode == 'delivery'
+                                    ? <String, dynamic>{
+                                        'recipient': recipient.text.trim(),
+                                        'phone': phone.text.trim(),
+                                        'line1': line1.text.trim(),
+                                        'city': city.text.trim(),
+                                        'postalCode': postal.text.trim(),
+                                        'landmark': landmark.text.trim(),
+                                        if (pin != null)
+                                          'latitude': pin!.latitude,
+                                        if (pin != null)
+                                          'longitude': pin!.longitude,
+                                      }
+                                    : null;
+                                m.configureCheckout(mode, address);
                                 await m.createOrder();
+                                if (address != null &&
+                                    saveThis &&
+                                    m.pendingOrder != null &&
+                                    m.api.token != null) {
+                                  _saveAddress(address);
+                                }
                               } else {
                                 await m.verifyTestPayment();
                                 if (context.mounted && m.pendingOrder == null) {

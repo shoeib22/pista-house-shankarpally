@@ -25,6 +25,26 @@ export const handleSchema = z
     /^[a-z0-9][a-z0-9._-]{2,47}$/,
     "Use 3–48 lowercase letters, numbers, dots, underscores or hyphens",
   );
+/**
+ * Indian mobile numbers are the customer handle. Accepts "+91 90000 00000",
+ * "09000000000" and similar, and returns the 10 digits, or null if it is not a
+ * mobile number.
+ */
+export function normalizePhone(input: string): string | null {
+  let digits = input.replace(/[\s().-]/g, "");
+  if (digits.startsWith("+")) digits = digits.slice(1);
+  if (digits.length === 12 && digits.startsWith("91")) digits = digits.slice(2);
+  else if (digits.length === 11 && digits.startsWith("0"))
+    digits = digits.slice(1);
+  return /^[6-9]\d{9}$/.test(digits) ? digits : null;
+}
+/** A sign-in handle: a username, or a mobile number written any usual way. */
+const loginHandle = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .transform((h) => normalizePhone(h) ?? h)
+  .pipe(handleSchema);
 export const passwordSchema = z
   .string()
   .min(12, "Use a passphrase of at least 12 characters")
@@ -119,7 +139,7 @@ export class Accounts {
     const { handle, password, audience } = parse(
       z
         .object({
-          handle: handleSchema,
+          handle: loginHandle,
           password: z.string().min(1).max(128),
           audience: audienceSchema,
         })
@@ -172,6 +192,81 @@ export class Accounts {
       });
       return session;
     });
+  }
+  /**
+   * Customer self-registration with a mobile number and a passphrase. The number
+   * is NOT verified (no SMS provider is configured), and this is only available
+   * where customer password sign-in is, i.e. the private beta.
+   */
+  async register(body: unknown, ip: string) {
+    const { name, phone, password } = parse(
+      z
+        .object({
+          name: z.string().trim().min(2, "Enter your name").max(60),
+          phone: z
+            .string()
+            .transform((v) => normalizePhone(v))
+            .refine(
+              (v): v is string => v !== null,
+              "Enter a valid 10-digit mobile number",
+            ),
+          password: passwordSchema,
+        })
+        .strict(),
+      body,
+    );
+    if (!betaEnabled() || process.env.CUSTOMER_REGISTRATION === "off")
+      throw new ServiceUnavailableException(
+        "Customer sign-up is not available yet",
+      );
+    await this.throttle("register", ip, phone as string);
+    const outletId = process.env.DEFAULT_OUTLET_ID || "shankarpally";
+    const outlet = await this.db.outlet.findUnique({ where: { id: outletId } });
+    if (!outlet)
+      throw new ServiceUnavailableException("The outlet is not configured");
+    if (
+      await this.db.credential.findUnique({
+        where: { handle: phone as string },
+      })
+    )
+      throw new ConflictException(
+        "An account with this mobile number already exists. Sign in instead.",
+      );
+    const hashed = await passwordHash(password);
+    try {
+      return await this.db.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: { outletId, name, role: "customer" },
+        });
+        await tx.credential.create({
+          data: {
+            userId: user.id,
+            handle: phone as string,
+            passwordHash: hashed,
+          },
+        });
+        const session = await newSession(tx, user);
+        await tx.auditEvent.create({
+          data: {
+            actorId: user.id,
+            outletId,
+            resourceId: user.id,
+            action: "account.registered",
+            detail: "customer, phone not verified",
+          },
+        });
+        return { ...session, phoneVerified: false, handle: phone };
+      });
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2002"
+      )
+        throw new ConflictException(
+          "An account with this mobile number already exists. Sign in instead.",
+        );
+      throw e;
+    }
   }
   async accept(body: unknown, ip: string) {
     const { token, password, audience } = parse(

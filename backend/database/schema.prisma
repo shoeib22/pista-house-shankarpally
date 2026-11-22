@@ -37,6 +37,7 @@ model User {
   invitationsCreated  Invitation[]         @relation("InvitationIssuer")
   recoveryInvitations Invitation[]         @relation("InvitationTarget")
   deliveryOffers      DeliveryOffer[]
+  savedAddresses      SavedAddress[]
 }
 
 model Session {
@@ -251,4 +252,26 @@ model DeliveryOffer {
   @@index([orderId, status])
   @@index([riderId, status])
   @@index([outletId, status, expiresAt])
+}
+
+/// A customer's own address book. Orders copy the address they use (a snapshot),
+/// so editing or deleting a saved address never changes past orders.
+model SavedAddress {
+  id         String   @id @default(uuid())
+  customerId String
+  customer   User     @relation(fields: [customerId], references: [id])
+  label      String
+  recipient  String
+  phone      String
+  line1      String
+  city       String
+  postalCode String
+  landmark   String?
+  latitude   Float?
+  longitude  Float?
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([customerId, updatedAt])
 }

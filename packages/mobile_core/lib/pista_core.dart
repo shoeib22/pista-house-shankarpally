@@ -1,10 +1,12 @@
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:pista_api/pista_api.dart';
+import 'saved_addresses.dart';
 export 'package:pista_api/pista_api.dart';
 export 'features/delivery/delivery_model.dart';
 export 'beta_endpoint.dart';
 export 'device_dish_saves.dart';
+export 'saved_addresses.dart';
 
 String requestKey() => List.generate(
   24,
@@ -18,6 +20,9 @@ class Product extends ProductDto {
 class CustomerModel extends ChangeNotifier {
   final PistaApi api;
   CustomerModel(this.api);
+
+  /// The signed-in customer's saved addresses.
+  late final AddressBook addresses = AddressBook(api);
   List<Product> products = [];
   List<Map<String, dynamic>> orders = [];
   final Map<String, int> cart = {};
@@ -31,6 +36,8 @@ class CustomerModel extends ChangeNotifier {
   bool get checkoutLocked => _checkoutKey != null || pendingOrder != null;
   void resetForServer() {
     api.token = null;
+    api.userName = api.userHandle = null;
+    addresses.clear();
     orders = [];
     cart.clear();
     pendingOrder = null;
@@ -191,6 +198,7 @@ class CustomerModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    addresses.dispose();
     api.close();
     super.dispose();
   }
@@ -200,6 +208,7 @@ class CustomerModel extends ChangeNotifier {
       await api.signOut();
     } finally {
       orders = [];
+      addresses.clear();
       pendingOrder = null;
       cart.clear();
       deliveryAddress = null;

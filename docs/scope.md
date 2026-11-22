@@ -16,7 +16,7 @@ The authoritative scope, pricing and commercial exclusions are recorded in `../P
 
 ## Still to build
 
-Customer phone authentication and production security hardening; real gateway integration, reconciliation and refunds; restaurant-approved prices, taxes, charges, delivery areas and policy; variants/add-ons; saved address books; rewards/coupons/favourites/reorder; notifications; remaining owner controls and reporting/export; durable mobile sessions/retries across process termination; production map-provider setup and native GPS/background testing; production service packaging, HTTPS, backups, monitoring and release readiness.
+Customer phone authentication and production security hardening; real gateway integration, reconciliation and refunds; restaurant-approved prices, taxes, charges, delivery areas and policy; variants/add-ons; rewards/coupons/favourites/reorder; notifications; remaining owner controls and reporting/export; durable mobile sessions/retries across process termination; production map-provider setup and native GPS/background testing; production service packaging, HTTPS, backups, monitoring and release readiness.
 
 Delivery is a connected development/private-beta workflow. The sample postcode 000000 is accepted only in explicit development or isolated beta mode; it is not a real service area. Customer phone authentication remains unconfigured. Outbox records are durable intents; no external notification or refund worker consumes them yet.
 

@@ -27,6 +27,7 @@ import {
 } from "./auth";
 import { Orders } from "./orders";
 import { permit } from "./domain";
+import { Addresses, AddressesController } from "./addresses";
 import { Delivery } from "./delivery";
 import { Dispatch } from "./dispatch";
 import { DeliveryController } from "./delivery.controller";
@@ -246,6 +247,7 @@ class ProtectedController {
     PublicController,
     ProtectedController,
     DeliveryController,
+    AddressesController,
     AccountAccessController,
     AccountManagementController,
     TrackingController,
@@ -256,6 +258,7 @@ class ProtectedController {
     SessionGuard,
     Orders,
     Delivery,
+    Addresses,
     Dispatch,
     Accounts,
     Tracking,

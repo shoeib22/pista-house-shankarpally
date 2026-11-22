@@ -20,6 +20,9 @@ export class AccountAccessController {
   @Post("login") login(@Body() body: unknown, @Req() req: Request) {
     return this.accounts.login(body, req.ip ?? "unknown");
   }
+  @Post("register") register(@Body() body: unknown, @Req() req: Request) {
+    return this.accounts.register(body, req.ip ?? "unknown");
+  }
   @Post("accept-invitation") accept(
     @Body() body: unknown,
     @Req() req: Request,

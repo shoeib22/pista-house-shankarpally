@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'features/checkout/screens/checkout_sheet.dart';
-import 'features/checkout/screens/beta_access_sheet.dart';
+import 'features/auth/auth_page.dart';
+import 'features/account/saved_addresses_page.dart';
 import 'package:pista_ui/pista_ui.dart';
 import 'package:pista_core/pista_core.dart';
 import 'package:pista_tracking/pista_tracking.dart';
@@ -383,30 +384,101 @@ class _CustomerHomeState extends State<CustomerHome> {
       ),
     ],
   );
-  Widget _profile() => ListView(
-    padding: const EdgeInsets.all(24),
-    children: [
-      const PistaLogo(),
-      const SizedBox(height: 24),
-      const Text(
-        'Your account',
-        style: TextStyle(fontSize: 26, fontWeight: FontWeight.w600),
-      ),
-      const SizedBox(height: 16),
-      const Text(
-        bool.fromEnvironment('BETA_TESTING')
-            ? 'This private beta uses an administrator-provided customer test account. Phone verification, saved addresses and live payments are not configured.'
-            : 'Browse without signing in. This development build signs in with a test customer at checkout. Phone verification, saved addresses and notification preferences are not configured yet.',
-        style: TextStyle(height: 1.7),
-      ),
-      if (const bool.fromEnvironment('BETA_TESTING')) ...[
-        const SizedBox(height: 20),
-        if (model.api.token == null)
+  Widget _profile() {
+    const beta = bool.fromEnvironment('BETA_TESTING');
+    final signedIn = model.api.token != null;
+    final name = model.api.userName;
+    final handle = model.api.userHandle;
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        const PistaLogo(),
+        const SizedBox(height: 24),
+        const Text(
+          'Your account',
+          style: TextStyle(fontSize: 26, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 16),
+        if (!beta)
+          const Text(
+            'Browse without signing in. This development build signs in with a test customer at checkout. Phone verification, saved addresses and notification preferences are not configured yet.',
+            style: TextStyle(height: 1.7),
+          )
+        else if (!signedIn) ...[
+          const Text(
+            'Create an account or sign in to order, track your delivery and save your addresses.',
+            style: TextStyle(height: 1.7),
+          ),
+          const SizedBox(height: 20),
           FilledButton(
             onPressed: () => _betaSignIn(),
-            child: const Text('Sign in to beta account'),
-          )
-        else
+            child: const Text('Sign in'),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton(
+            onPressed: () => _betaSignIn(signUp: true),
+            child: const Text('Create account'),
+          ),
+        ] else ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFAF3),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE1D4BC)),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: heritageGreen,
+                  foregroundColor: const Color(0xFFFFF1CF),
+                  child: Text(
+                    (name ?? '?').trim().isEmpty
+                        ? '?'
+                        : (name ?? '?').trim()[0].toUpperCase(),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name ?? 'Signed in',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 17,
+                        ),
+                      ),
+                      if (handle != null)
+                        Text(
+                          RegExp(r'^\d{10}$').hasMatch(handle)
+                              ? '+91 $handle'
+                              : handle,
+                          style: const TextStyle(color: Colors.black54),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.place_outlined, color: heritageGreen),
+            title: const Text('Saved addresses'),
+            subtitle: const Text('Add, edit or choose a default'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push<void>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SavedAddressesPage(model: model),
+              ),
+            ),
+          ),
+          const Divider(),
+          const SizedBox(height: 8),
           OutlinedButton(
             onPressed: model.busy
                 ? null
@@ -418,18 +490,28 @@ class _CustomerHomeState extends State<CustomerHome> {
                   },
             child: const Text('Sign out'),
           ),
+        ],
+        if (beta) ...[
+          const SizedBox(height: 20),
+          const Text(
+            'Private beta: your mobile number is not verified yet, orders use sample menu data and payments are simulated.',
+            style: TextStyle(fontSize: 12, height: 1.6, color: Colors.black54),
+          ),
+        ],
       ],
-    ],
-  );
-  Future<bool> _betaSignIn() async {
-    final accepted = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (context) => BetaAccessSheet(api: model.api),
+    );
+  }
+
+  Future<bool> _betaSignIn({bool signUp = false}) async {
+    final accepted = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CustomerAuthPage(api: model.api, startOnSignUp: signUp),
+      ),
     );
     if (accepted == true) {
       await model.refresh();
+      model.addresses.load(force: true);
       return true;
     }
     return false;
