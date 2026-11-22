@@ -14,7 +14,8 @@ export type Permission =
   | "audit:read"
   | "reports:read"
   | "delivery:dispatch"
-  | "users:manage";
+  | "users:manage"
+  | "payments:refund";
 const permissions: Record<Role, Permission[]> = {
   customer: [],
   rider: [],
@@ -39,6 +40,7 @@ const permissions: Record<Role, Permission[]> = {
     "outlet:pause",
     "reports:read",
     "users:manage",
+    "payments:refund",
   ],
 };
 export function permit(role: string, permission: Permission) {

@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Pista House Shankarpally API",
-    "version": "0.8.0",
+    "version": "0.9.0",
     "description": "Single-outlet pickup, delivery and private beta API. Real menu, payments, phone authentication and service zones require launch configuration. Live GPS is scoped to active rider sharing leases; map selection does not approve a delivery zone."
   },
   "servers": [
@@ -4594,6 +4594,430 @@
           },
           "429": {
             "description": "Too many attempts"
+          }
+        }
+      }
+    },
+    "/payments/config": {
+      "get": {
+        "operationId": "paymentConfig",
+        "summary": "Which payment provider the server uses and whether it is the test provider",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "provider, simulated, currency, sessionMinutes, maxAttempts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "503": {
+            "description": "Payments are not configured, or test payments are disabled"
+          }
+        }
+      }
+    },
+    "/orders/{id}/payments": {
+      "post": {
+        "operationId": "startPayment",
+        "summary": "Start (or resume) paying for an order; the amount is always the order's server-side total",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "paymentId, provider, amountPaise, expiresAt and the gateway's public checkout values (never secrets).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "409": {
+            "description": "Order is already paid or can no longer be paid"
+          },
+          "429": {
+            "description": "Too many payment attempts"
+          },
+          "503": {
+            "description": "Payment service unavailable"
+          }
+        }
+      }
+    },
+    "/orders/{id}/payment": {
+      "get": {
+        "operationId": "orderPaymentStatus",
+        "summary": "Payment state of an order: latest attempt, retry allowed, refunds (customer own order; owner/counter any)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "404": {
+            "description": "Order not found"
+          }
+        }
+      }
+    },
+    "/payments/{id}/confirm": {
+      "post": {
+        "operationId": "confirmPayment",
+        "summary": "The customer says they finished paying. Never trusted: any gateway proof is verified and the server asks the gateway",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated payment status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "400": {
+            "description": "Payment proof could not be verified"
+          }
+        }
+      }
+    },
+    "/payments/{id}/simulate": {
+      "post": {
+        "operationId": "simulatePayment",
+        "summary": "Test payments only: choose success, failure or pending",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated payment status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "403": {
+            "description": "Only available with test payments"
+          }
+        }
+      }
+    },
+    "/payments/webhook/{provider}": {
+      "post": {
+        "operationId": "paymentWebhook",
+        "summary": "Signed gateway notifications. Public by design: the signature over the raw body is the credential. Duplicate deliveries are ignored",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok, ignored or duplicate.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing signature"
+          },
+          "404": {
+            "description": "Not the active provider"
+          }
+        }
+      }
+    },
+    "/orders/{id}/refunds": {
+      "post": {
+        "operationId": "refundOrder",
+        "summary": "Owner refund, full or partial; idempotent by Idempotency-Key and never more than was paid",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The refund.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "403": {
+            "description": "Owner only"
+          },
+          "409": {
+            "description": "Nothing to refund, too much, or a full refund of an order still in progress"
+          },
+          "502": {
+            "description": "The gateway could not process the refund (recorded as failed)"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listOrderRefunds",
+        "summary": "Refunds on an order",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Refunds.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          }
+        }
+      }
+    },
+    "/payments/reconcile": {
+      "get": {
+        "operationId": "paymentReconciliation",
+        "summary": "Payments open too long, amount mismatches and refunds needing attention (owner)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Items needing a look.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "403": {
+            "description": "Owner only"
+          }
+        }
+      }
+    },
+    "/payments/reconcile/run": {
+      "post": {
+        "operationId": "runPaymentReconciliation",
+        "summary": "Check open payments with the gateway now and apply timeouts (owner)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Counts checked, expired, closed and retried.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "403": {
+            "description": "Owner only"
           }
         }
       }

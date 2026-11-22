@@ -90,6 +90,7 @@ model Order {
   deliveryAddress Json?
   assignments     DeliveryAssignment[]
   offers          DeliveryOffer[]
+  payments        Payment[]
 
   @@unique([customerId, idempotencyKey])
   @@index([outletId, status, createdAt])
@@ -295,4 +296,65 @@ model EmailCode {
 
   @@index([userId, purpose, createdAt])
   @@index([createdAt])
+}
+
+/// One attempt to pay for an order through a payment provider. Money is only
+/// ever considered received when the server has verified it with the provider
+/// (signed webhook or a direct lookup), never because the app said so.
+model Payment {
+  id                String    @id @default(uuid())
+  orderId           String
+  order             Order     @relation(fields: [orderId], references: [id])
+  outletId          String
+  provider          String
+  providerOrderId   String?
+  providerPaymentId String?
+  amountPaise       Int
+  currency          String    @default("INR")
+  /// created | paid | failed | expired | cancelled | mismatch
+  status            String    @default("created")
+  method            String?
+  failureCode       String?
+  failureReason     String?
+  expiresAt         DateTime
+  paidAt            DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  refunds           Refund[]
+
+  @@unique([provider, providerOrderId])
+  @@unique([provider, providerPaymentId])
+  @@index([orderId, createdAt])
+  @@index([status, expiresAt])
+}
+
+model Refund {
+  id               String   @id @default(uuid())
+  paymentId        String
+  payment          Payment  @relation(fields: [paymentId], references: [id])
+  orderId          String
+  outletId         String
+  amountPaise      Int
+  reason           String
+  /// requested | processing | succeeded | failed
+  status           String   @default("requested")
+  providerRefundId String?
+  failureReason    String?
+  requestedById    String?
+  idempotencyKey   String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([orderId, idempotencyKey])
+  @@index([paymentId])
+  @@index([orderId, createdAt])
+}
+
+/// Remembers webhook deliveries so a retried delivery is applied only once.
+model WebhookEvent {
+  id          String    @id
+  provider    String
+  type        String
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
 }

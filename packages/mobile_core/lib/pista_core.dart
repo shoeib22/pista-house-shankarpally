@@ -180,6 +180,19 @@ class CustomerModel extends ChangeNotifier {
         .map((o) => Map<String, dynamic>.from(o))
         .toList();
   });
+
+  /// Called after the server reports an order as paid: clears the finished
+  /// checkout and reloads the customer's orders.
+  Future<void> paymentFinished() => work(() async {
+    cart.clear();
+    pendingOrder = null;
+    _checkoutKey = null;
+    _paymentEvent = null;
+    orders = (await api.request('/orders') as List)
+        .map((o) => Map<String, dynamic>.from(o))
+        .toList();
+  });
+
   Future<void> verifyTestPayment() => work(() async {
     if (pendingOrder == null) return;
     _paymentEvent ??= requestKey();

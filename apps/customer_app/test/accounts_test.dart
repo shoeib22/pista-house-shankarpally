@@ -171,7 +171,10 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
     expect(find.text('Create your account'), findsOneWidget);
-    expect(find.textContaining('not verified in this private beta'), findsOneWidget);
+    expect(
+      find.textContaining('not verified in this private beta'),
+      findsOneWidget,
+    );
     // Nothing valid yet.
     await tester.ensureVisible(
       find.widgetWithText(FilledButton, 'Create account'),

@@ -10,7 +10,8 @@ async function main() {
     process.env.DEV_ADAPTERS === "true"
   )
     throw new Error("Development adapters are prohibited in production");
-  const app = await NestFactory.create(AppModule);
+  // rawBody: payment webhooks are signed over the exact bytes received.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   app.enableCors({
     origin: process.env.DASHBOARD_ORIGIN || "http://localhost:5173",
     methods: ["GET", "POST", "PATCH", "DELETE"],

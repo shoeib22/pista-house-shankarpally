@@ -148,6 +148,46 @@ class PistaApi {
     emailVerified = true;
   }
 
+  // ---- payments ----------------------------------------------------
+
+  /// Which payment provider the server uses, and whether it is the test one.
+  Future<Map<String, dynamic>> paymentConfig() async =>
+      Map<String, dynamic>.from(await request('/payments/config'));
+
+  /// Starts (or resumes) paying for an order. The server chooses the amount.
+  Future<Map<String, dynamic>> startPayment(String orderId) async =>
+      Map<String, dynamic>.from(
+        await request('/orders/$orderId/payments', method: 'POST'),
+      );
+
+  Future<Map<String, dynamic>> paymentStatus(String orderId) async =>
+      Map<String, dynamic>.from(await request('/orders/$orderId/payment'));
+
+  /// Tells the server the customer has finished paying. The server verifies any
+  /// proof and checks with the gateway; it never takes the app's word for it.
+  Future<Map<String, dynamic>> confirmPayment(
+    String paymentId, {
+    Map<String, dynamic>? result,
+  }) async => Map<String, dynamic>.from(
+    await request(
+      '/payments/$paymentId/confirm',
+      method: 'POST',
+      body: {if (result != null) 'result': result},
+    ),
+  );
+
+  /// Test-payment control (only works when the server uses the simulated provider).
+  Future<Map<String, dynamic>> simulatePayment(
+    String paymentId,
+    String outcome,
+  ) async => Map<String, dynamic>.from(
+    await request(
+      '/payments/$paymentId/simulate',
+      method: 'POST',
+      body: {'outcome': outcome},
+    ),
+  );
+
   /// Asks for a passphrase reset code. The server answers the same for every
   /// identifier, so this reveals nothing about who has an account.
   Future<String> forgotPassphrase(String identifier) async {

@@ -34,6 +34,11 @@ import {
   EmailRecoveryController,
 } from "./accounts/email";
 import { Mailer } from "./mailer";
+import {
+  PaymentWebhookController,
+  Payments,
+  PaymentsController,
+} from "./payments/payments";
 import { Delivery } from "./delivery";
 import { Dispatch } from "./dispatch";
 import { DeliveryController } from "./delivery.controller";
@@ -257,6 +262,8 @@ class ProtectedController {
     AccountAccessController,
     EmailRecoveryController,
     EmailManagementController,
+    PaymentsController,
+    PaymentWebhookController,
     AccountManagementController,
     TrackingController,
     MapsController,
@@ -269,6 +276,7 @@ class ProtectedController {
     Addresses,
     Mailer,
     EmailAccounts,
+    Payments,
     Dispatch,
     Accounts,
     Tracking,

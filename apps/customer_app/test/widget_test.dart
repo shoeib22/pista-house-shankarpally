@@ -53,6 +53,52 @@ class JourneyApi extends PistaApi {
       order!['paymentStatus'] = 'paid';
       return order;
     }
+    if (path == '/payments/config') {
+      return {'provider': 'simulated', 'simulated': true, 'currency': 'INR'};
+    }
+    if (path == '/orders/order-1/payments' && method == 'POST') {
+      return {
+        'paymentId': 'pay-1',
+        'provider': 'simulated',
+        'simulated': true,
+        'amountPaise': 29900,
+        'currency': 'INR',
+        'expiresAt': DateTime.now()
+            .add(const Duration(minutes: 15))
+            .toUtc()
+            .toIso8601String(),
+        'clientParams': {'simulated': true},
+      };
+    }
+    if (path == '/orders/order-1/payment' ||
+        path == '/payments/pay-1/confirm') {
+      final paid = order?['paymentStatus'] == 'paid';
+      return {
+        'orderId': 'order-1',
+        'orderPaymentStatus': paid ? 'paid' : 'pending',
+        'amountPaise': 29900,
+        'payment': paid || path.endsWith('/confirm')
+            ? {'id': 'pay-1', 'status': paid ? 'paid' : 'created'}
+            : null,
+        'attempts': 0,
+        'canRetry': true,
+        'refundedPaise': 0,
+        'refunds': [],
+      };
+    }
+    if (path == '/payments/pay-1/simulate') {
+      order!['paymentStatus'] = 'paid';
+      return {
+        'orderId': 'order-1',
+        'orderPaymentStatus': 'paid',
+        'amountPaise': 29900,
+        'payment': {'id': 'pay-1', 'status': 'paid'},
+        'attempts': 1,
+        'canRetry': false,
+        'refundedPaise': 0,
+        'refunds': [],
+      };
+    }
     if (path == '/orders') return order == null ? [] : [order];
     throw StateError('Unexpected request $path');
   }
@@ -167,7 +213,17 @@ void main() {
       await tester.tap(find.text('Save order & review payment →'));
       await tester.pumpAndSettle();
       expect(find.text('Server total: ₹299'), findsOneWidget);
-      await tester.tap(find.text('Confirm test payment →'));
+      // The new payment page: server total, then the test checkout.
+      await tester.tap(find.text('Pay ₹299 →'));
+      await tester.pumpAndSettle();
+      expect(find.text('Total to pay'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Pay ₹299'));
+      await tester.pumpAndSettle();
+      expect(find.text('Test payment'), findsOneWidget);
+      await tester.tap(find.text('Pay successfully'));
+      await tester.pumpAndSettle();
+      expect(find.text('Payment received'), findsOneWidget);
+      await tester.tap(find.text('View my order'));
       await tester.pumpAndSettle();
       expect(find.text('#PH0001'), findsOneWidget);
       expect(find.text('Payment: paid'), findsOneWidget);

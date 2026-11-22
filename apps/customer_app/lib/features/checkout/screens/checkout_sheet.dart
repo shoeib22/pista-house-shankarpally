@@ -1,6 +1,7 @@
 import 'package:pista_ui/pista_ui.dart';
 import 'package:pista_core/pista_core.dart';
 import 'package:pista_tracking/pista_tracking.dart';
+import '../../payment/payment_page.dart';
 
 class CheckoutSheet extends StatefulWidget {
   final CustomerModel model;
@@ -381,9 +382,33 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                                   _saveAddress(address);
                                 }
                               } else {
-                                await m.verifyTestPayment();
-                                if (context.mounted && m.pendingOrder == null) {
-                                  Navigator.pop(context);
+                                final order = m.pendingOrder!;
+                                final paid = await Navigator.push<bool>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => PaymentPage(
+                                      api: m.api,
+                                      orderId: '${order['id']}',
+                                      orderNumber:
+                                          (order['number'] as num?)?.toInt() ??
+                                          0,
+                                      items: (order['items'] as List? ?? [])
+                                          .map(
+                                            (i) => Map<String, dynamic>.from(i),
+                                          )
+                                          .toList(),
+                                      deliveryPaise:
+                                          (order['deliveryPaise'] as num?)
+                                              ?.toInt() ??
+                                          0,
+                                    ),
+                                  ),
+                                );
+                                if (paid == true) {
+                                  await m.paymentFinished();
+                                  if (context.mounted) Navigator.pop(context);
+                                } else {
+                                  await m.refresh();
                                 }
                               }
                             },
@@ -392,7 +417,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                             ? 'Please wait…'
                             : m.pendingOrder == null
                             ? 'Save order & review payment →'
-                            : 'Confirm test payment →',
+                            : 'Pay ${rupees(m.pendingOrder!['totalPaise'] as int)} →',
                       ),
                     ),
                   ),
