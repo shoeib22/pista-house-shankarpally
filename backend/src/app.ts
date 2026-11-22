@@ -28,6 +28,7 @@ import {
 import { Orders } from "./orders";
 import { permit } from "./domain";
 import { Delivery } from "./delivery";
+import { Dispatch } from "./dispatch";
 import { DeliveryController } from "./delivery.controller";
 import { Accounts } from "./accounts/accounts";
 import { betaEnabled } from "./runtime";
@@ -255,6 +256,7 @@ class ProtectedController {
     SessionGuard,
     Orders,
     Delivery,
+    Dispatch,
     Accounts,
     Tracking,
     TrackingGateway,

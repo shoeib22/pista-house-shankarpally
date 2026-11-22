@@ -22,4 +22,4 @@ Delivery is a connected development/private-beta workflow. The sample postcode 0
 
 ## Exclusions preserved
 
-No customer web storefront, COD, automatic dispatch, route optimisation, off-shift GPS, multi-outlet management or VPS rental. Petpooja is not implemented and remains separately authorised/scoped. No development timeline commitments or commercial changes are introduced.
+Automatic rider assignment exists only as an owner-controlled, off-by-default option (`auto_dispatch.md`). No customer web storefront, COD, multi-order batching, route optimisation, off-shift GPS, multi-outlet management or VPS rental. Petpooja is not implemented and remains separately authorised/scoped. No development timeline commitments or commercial changes are introduced.

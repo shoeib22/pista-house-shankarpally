@@ -26,7 +26,8 @@ class _OwnerHomeState extends State<OwnerHome> {
   late final api = widget.api ?? PistaApi();
   List<Map<String, dynamic>> orders = [];
   List<Map<String, dynamic>> riders = [];
-  bool busy = false, paused = false, signedIn = false;
+  bool busy = false, paused = false, autoDispatch = false, signedIn = false;
+  Map<String, dynamic>? dispatch;
   String? error;
   Future<void> run(Future<void> Function() action) async {
     setState(() {
@@ -52,10 +53,48 @@ class _OwnerHomeState extends State<OwnerHome> {
     orders = (await api.request('/orders') as List)
         .map((o) => Map<String, dynamic>.from(o))
         .toList();
-    paused = (await api.request('/outlet'))['paused'];
+    final outlet = await api.request('/outlet');
+    paused = outlet['paused'];
+    autoDispatch = outlet['autoDispatch'] == true;
+    try {
+      dispatch = Map<String, dynamic>.from(
+        await api.request('/dispatch/status'),
+      );
+    } catch (_) {
+      dispatch =
+          null; // An older server has no auto-dispatch: manual assignment still works.
+    }
     riders = (await api.request('/riders') as List)
         .map((r) => Map<String, dynamic>.from(r))
         .toList();
+  }
+
+  Widget _dispatchStatus() {
+    final offers = (dispatch!['offers'] as List? ?? []);
+    final manual = (dispatch!['needsManual'] as List? ?? []);
+    if (offers.isEmpty && manual.isEmpty) return const SizedBox.shrink();
+    String tag(dynamic n) => '#PH${'$n'.padLeft(4, '0')}';
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: pistaIvory,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final o in offers)
+            Text('Offering ${tag(o['number'])} to ${o['rider']}…'),
+          for (final o in manual)
+            Text(
+              '${tag(o['number'])} has no rider to offer. Assign one by hand below.',
+              style: const TextStyle(color: Color(0xFF956233)),
+            ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -238,6 +277,27 @@ class _OwnerHomeState extends State<OwnerHome> {
                     await refresh();
                   }),
           ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Auto-assign riders'),
+            subtitle: Text(
+              autoDispatch
+                  ? 'Ready orders are offered to online riders. You can still assign by hand.'
+                  : 'Off. Assign riders by hand.',
+            ),
+            value: autoDispatch,
+            onChanged: busy
+                ? null
+                : (value) => run(() async {
+                    await api.request(
+                      '/outlet/auto-dispatch',
+                      method: 'PATCH',
+                      body: {'enabled': value},
+                    );
+                    await refresh();
+                  }),
+          ),
+          if (autoDispatch && dispatch != null) _dispatchStatus(),
           const Divider(height: 34),
           const Text(
             'Recent orders',

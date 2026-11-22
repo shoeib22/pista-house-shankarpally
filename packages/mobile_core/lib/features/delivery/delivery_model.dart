@@ -5,6 +5,11 @@ class DeliveryModel extends ChangeNotifier {
   final PistaApi api;
   DeliveryModel(this.api);
   List<Map<String, dynamic>> tasks = [];
+
+  /// A live auto-dispatch offer for this rider, if any, and how far the
+  /// server's clock is from this phone's (so the countdown stays honest).
+  Map<String, dynamic>? offer;
+  Duration clockSkew = Duration.zero;
   bool signedIn = false,
       available = false,
       busy = false,
@@ -24,6 +29,25 @@ class DeliveryModel extends ChangeNotifier {
     available = data['available'];
     connected = true;
     pendingAction = null;
+    await _loadOffer();
+  }
+
+  Future<void> _loadOffer() async {
+    if (!available) {
+      offer = null;
+      return;
+    }
+    try {
+      final data = await api.request('/rider/offer');
+      offer = data['offer'] is Map
+          ? Map<String, dynamic>.from(data['offer'])
+          : null;
+      final server = DateTime.tryParse('${data['serverTime']}');
+      if (server != null) clockSkew = server.difference(DateTime.now());
+    } catch (_) {
+      // Offers are optional: an older server or a blip must not break tasks.
+      offer = null;
+    }
   }
 
   Future<void> refresh() async {
@@ -62,6 +86,7 @@ class DeliveryModel extends ChangeNotifier {
     signedIn = false;
     connected = false;
     tasks = [];
+    offer = null;
     pendingAction = null;
     available = false;
     notifyListeners();
@@ -72,6 +97,7 @@ class DeliveryModel extends ChangeNotifier {
     signedIn = false;
     connected = false;
     tasks = [];
+    offer = null;
     pendingAction = null;
     available = false;
     notifyListeners();
@@ -137,6 +163,17 @@ class DeliveryModel extends ChangeNotifier {
     {'available': value},
     'Availability change',
   );
+  Future<void> respondToOffer(bool accept) {
+    final id = offer?['id'];
+    if (id == null) return Future.value();
+    return _mutate(
+      '/rider/offers/$id/respond',
+      'POST',
+      {'accept': accept},
+      accept ? 'Accepting the delivery' : 'Declining the delivery',
+    );
+  }
+
   Future<void> pickup(Map<String, dynamic> task) => _mutate(
     '/rider/tasks/${task['id']}/actions',
     'POST',

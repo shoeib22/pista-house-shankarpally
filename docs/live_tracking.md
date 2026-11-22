@@ -1,6 +1,6 @@
 # Maps and live delivery tracking
 
-Implemented 22 November 2026. This extends the earlier scope to location sharing during active deliveries. It does not add automatic dispatch, route optimisation or off-shift tracking.
+Implemented 22 November 2026. This extends the earlier scope to location sharing during active deliveries. It does not add route optimisation or off-shift tracking. Optional auto-assignment is documented separately in `auto_dispatch.md`.
 
 ## Customer journey
 

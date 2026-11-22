@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'features/tasks/widgets/offer_card.dart';
 import 'features/tasks/widgets/verification_dialog.dart';
 import 'package:pista_ui/pista_ui.dart';
 import 'package:pista_core/pista_core.dart';
@@ -32,7 +33,7 @@ class _DeliveryHomeState extends State<DeliveryHome> {
   @override
   void initState() {
     super.initState();
-    poll = Timer.periodic(const Duration(seconds: 5), (_) => model.refresh());
+    poll = Timer.periodic(const Duration(seconds: 4), (_) => model.refresh());
   }
 
   @override
@@ -196,6 +197,15 @@ class _DeliveryHomeState extends State<DeliveryHome> {
                 ],
               ),
               const SizedBox(height: 22),
+              if (model.offer != null && model.available)
+                OfferCard(
+                  key: ValueKey(model.offer!['id']),
+                  offer: model.offer!,
+                  clockSkew: model.clockSkew,
+                  busy: model.busy,
+                  onAccept: () => model.respondToOffer(true),
+                  onDecline: () => model.respondToOffer(false),
+                ),
               SegmentedButton<bool>(
                 segments: const [
                   ButtonSegment(value: false, label: Text('Active tasks')),
@@ -279,6 +289,28 @@ class _DeliveryHomeState extends State<DeliveryHome> {
                   icon: const Icon(Icons.navigation_outlined, size: 17),
                   label: const Text('Navigate'),
                 ),
+                if (a['latitude'] != null &&
+                    a['longitude'] != null &&
+                    ['assigned', 'picked_up'].contains(task['status']))
+                  TextButton.icon(
+                    onPressed: () => Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RiderRoutePage(
+                          api: model.api,
+                          assignmentId: task['id'],
+                          status: task['status'],
+                          recipient: '${a['recipient']}',
+                          destination: LatLng(
+                            (a['latitude'] as num).toDouble(),
+                            (a['longitude'] as num).toDouble(),
+                          ),
+                        ),
+                      ),
+                    ),
+                    icon: const Icon(Icons.map_outlined, size: 17),
+                    label: const Text('Map'),
+                  ),
                 TextButton.icon(
                   onPressed: () =>
                       open(Uri(scheme: 'tel', path: '${a['phone']}')),

@@ -543,4 +543,147 @@ export class Tracking {
       calculatedAt: new Date().toISOString(),
     };
   }
+
+  private riderRoutes = new Map<string, { until: number; value: unknown }>();
+
+  /**
+   * Road route for the rider's own active delivery: from where the rider's phone
+   * says they are, to the outlet (before pickup) and on to the customer's pin.
+   * The rider's position is supplied by the rider for this request only and is
+   * not stored. Not traffic-aware.
+   */
+  async riderRoute(
+    actor: Actor,
+    assignmentId: string,
+    rawLat: unknown,
+    rawLon: unknown,
+  ) {
+    if (actor.role !== "rider") throw new UnauthorizedException();
+    const q = z
+      .object({
+        lat: z.coerce.number().finite().min(-90).max(90),
+        lon: z.coerce.number().finite().min(-180).max(180),
+      })
+      .safeParse({ lat: rawLat, lon: rawLon });
+    if (!q.success)
+      throw new BadRequestException("A valid current position is required");
+    if (typeof assignmentId !== "string" || assignmentId.length > 100)
+      throw new NotFoundException("No active delivery");
+    const a = await this.db.deliveryAssignment.findFirst({
+      where: {
+        id: assignmentId,
+        riderId: actor.id,
+        isActive: true,
+        status: { in: ["assigned", "picked_up"] },
+        order: { outletId: actor.outletId },
+      },
+      select: {
+        status: true,
+        order: {
+          select: {
+            deliveryAddress: true,
+            outlet: { select: { latitude: true, longitude: true } },
+          },
+        },
+      },
+    });
+    if (!a) throw new NotFoundException("No active delivery");
+    const address = a.order.deliveryAddress as {
+      latitude?: unknown;
+      longitude?: unknown;
+    } | null;
+    if (
+      typeof address?.latitude !== "number" ||
+      typeof address?.longitude !== "number"
+    )
+      return { available: false, reason: "This order has no delivery pin" };
+    const endpoint = process.env.MAPS_ROUTING_URL;
+    if (!endpoint)
+      return { available: false, reason: "Road routing is not configured" };
+    const stops: {
+      kind: "outlet" | "customer";
+      latitude: number;
+      longitude: number;
+    }[] = [];
+    const o = a.order.outlet;
+    if (a.status === "assigned" && o.latitude !== null && o.longitude !== null)
+      stops.push({
+        kind: "outlet",
+        latitude: o.latitude,
+        longitude: o.longitude,
+      });
+    stops.push({
+      kind: "customer",
+      latitude: address.latitude,
+      longitude: address.longitude,
+    });
+    const key =
+      assignmentId +
+      ":" +
+      a.status +
+      ":" +
+      q.data.lat.toFixed(3) +
+      ":" +
+      q.data.lon.toFixed(3);
+    const cached = this.riderRoutes.get(key);
+    if (cached && cached.until > Date.now()) return cached.value;
+    try {
+      const path = [{ latitude: q.data.lat, longitude: q.data.lon }, ...stops]
+        .map((p) => `${p.longitude},${p.latitude}`)
+        .join(";");
+      const url = new URL(`/route/v1/driving/${path}`, endpoint);
+      url.searchParams.set("overview", "full");
+      url.searchParams.set("geometries", "geojson");
+      const response = await fetch(url, { signal: AbortSignal.timeout(7000) });
+      const data = (await response.json()) as any;
+      const parsed = z
+        .object({
+          duration: z.number().finite().min(0).max(86400),
+          distance: z.number().finite().min(0).max(20000000),
+          geometry: z.object({
+            coordinates: z
+              .array(
+                z.tuple([
+                  z.number().finite().min(-180).max(180),
+                  z.number().finite().min(-90).max(90),
+                ]),
+              )
+              .min(2)
+              .max(20000),
+          }),
+          legs: z
+            .array(
+              z.object({
+                duration: z.number().finite().min(0),
+                distance: z.number().finite().min(0),
+              }),
+            )
+            .max(4),
+        })
+        .safeParse(data.routes?.[0]);
+      if (!response.ok || data.code !== "Ok" || !parsed.success)
+        throw new Error();
+      const value = {
+        available: true,
+        coordinates: parsed.data.geometry.coordinates,
+        durationSeconds: parsed.data.duration,
+        distanceMetres: parsed.data.distance,
+        legs: parsed.data.legs.map((l) => ({
+          durationSeconds: l.duration,
+          distanceMetres: l.distance,
+        })),
+        stops,
+        trafficAware: false,
+        calculatedAt: new Date().toISOString(),
+      };
+      if (this.riderRoutes.size > 256) this.riderRoutes.clear();
+      this.riderRoutes.set(key, { until: Date.now() + 20000, value });
+      return value;
+    } catch {
+      return {
+        available: false,
+        reason: "Road routing is temporarily unavailable",
+      };
+    }
+  }
 }

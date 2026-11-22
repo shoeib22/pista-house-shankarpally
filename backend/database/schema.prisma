@@ -10,6 +10,7 @@ model Outlet {
   id            String         @id
   name          String
   paused        Boolean        @default(false)
+  autoDispatch  Boolean        @default(false)
   latitude      Float?
   longitude     Float?
   users         User[]
@@ -35,6 +36,7 @@ model User {
   credential          Credential?
   invitationsCreated  Invitation[]         @relation("InvitationIssuer")
   recoveryInvitations Invitation[]         @relation("InvitationTarget")
+  deliveryOffers      DeliveryOffer[]
 }
 
 model Session {
@@ -83,6 +85,7 @@ model Order {
   paymentEvents   PaymentEvent[]
   deliveryAddress Json?
   assignments     DeliveryAssignment[]
+  offers          DeliveryOffer[]
 
   @@unique([customerId, idempotencyKey])
   @@index([outletId, status, createdAt])
@@ -227,4 +230,25 @@ model AuthThrottle {
   resetAt  DateTime
 
   @@index([resetAt])
+}
+
+/// A time-limited offer of one ready order to one rider. A partial unique index
+/// (see the migration) allows only one live offer per rider and per order, which
+/// is what prevents double-booking.
+model DeliveryOffer {
+  id          String    @id @default(uuid())
+  outletId    String
+  orderId     String
+  order       Order     @relation(fields: [orderId], references: [id])
+  riderId     String
+  rider       User      @relation(fields: [riderId], references: [id])
+  status      String    @default("offered")
+  score       Float?
+  expiresAt   DateTime
+  respondedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([orderId, status])
+  @@index([riderId, status])
+  @@index([outletId, status, expiresAt])
 }

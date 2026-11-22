@@ -20,6 +20,7 @@ import { Database } from "./database";
 import { Actor } from "./auth";
 import { customerOnly, permit } from "./domain";
 import { assignmentSummary } from "./orders";
+import { haversineKm } from "./dispatch";
 const versionBody = z
   .object({ version: z.number().int().nonnegative() })
   .strict();
@@ -198,6 +199,156 @@ export class Delivery {
       return assignment;
     });
   }
+  /** The rider's current live offer, with only what is needed to decide. */
+  async currentOffer(actor: Actor) {
+    riderOnly(actor);
+    const now = new Date();
+    const offer = await this.db.deliveryOffer.findFirst({
+      where: {
+        riderId: actor.id,
+        outletId: actor.outletId,
+        status: "offered",
+        expiresAt: { gt: now },
+      },
+      select: {
+        id: true,
+        expiresAt: true,
+        order: {
+          select: {
+            number: true,
+            deliveryPaise: true,
+            deliveryAddress: true,
+            items: { select: { quantity: true } },
+            outlet: { select: { name: true, latitude: true, longitude: true } },
+          },
+        },
+      },
+    });
+    if (!offer) return { offer: null, serverTime: now.toISOString() };
+    const address = offer.order.deliveryAddress as {
+      city?: string;
+      postalCode?: string;
+      landmark?: string;
+      latitude?: number;
+      longitude?: number;
+    } | null;
+    const from = offer.order.outlet;
+    const distanceKm =
+      from.latitude !== null &&
+      from.longitude !== null &&
+      typeof address?.latitude === "number" &&
+      typeof address?.longitude === "number"
+        ? haversineKm(
+            { latitude: from.latitude, longitude: from.longitude },
+            { latitude: address.latitude, longitude: address.longitude },
+          )
+        : null;
+    return {
+      serverTime: now.toISOString(),
+      offer: {
+        id: offer.id,
+        expiresAt: offer.expiresAt.toISOString(),
+        order: {
+          number: offer.order.number,
+          itemCount: offer.order.items.reduce((n, i) => n + i.quantity, 0),
+          deliveryPaise: offer.order.deliveryPaise,
+          // The customer's name, phone and street are shared only after accepting.
+          area: [address?.landmark, address?.city, address?.postalCode]
+            .filter(Boolean)
+            .join(" · "),
+          pickup: from.name,
+          distanceKm:
+            distanceKm === null ? null : Math.round(distanceKm * 10) / 10,
+        },
+      },
+    };
+  }
+
+  async respondOffer(actor: Actor, id: string, body: unknown) {
+    riderOnly(actor);
+    const { accept } = parse(z.object({ accept: z.boolean() }).strict(), body);
+    const offer = await this.db.deliveryOffer.findFirst({
+      where: { id, riderId: actor.id, outletId: actor.outletId },
+    });
+    if (!offer) throw new NotFoundException("Offer not found");
+    if (!accept) {
+      await this.db.deliveryOffer.updateMany({
+        where: { id, status: "offered" },
+        data: { status: "declined", respondedAt: new Date() },
+      });
+      return { ok: true, accepted: false };
+    }
+    try {
+      const assignment = await this.db.$transaction(async (tx) => {
+        const claimed = await tx.deliveryOffer.updateMany({
+          where: { id, status: "offered", expiresAt: { gt: new Date() } },
+          data: { status: "accepted", respondedAt: new Date() },
+        });
+        if (!claimed.count)
+          throw new ConflictException(
+            "This offer has expired or was withdrawn",
+          );
+        const order = await tx.order.findFirst({
+          where: { id: offer.orderId, outletId: actor.outletId },
+        });
+        if (
+          !order ||
+          order.fulfilment !== "delivery" ||
+          order.status !== "ready" ||
+          order.paymentStatus !== "paid"
+        )
+          throw new ConflictException("This order is no longer available");
+        const rider = await tx.user.findFirst({
+          where: {
+            id: actor.id,
+            outletId: actor.outletId,
+            role: "rider",
+            riderAvailable: true,
+            disabledAt: null,
+          },
+        });
+        if (!rider)
+          throw new ConflictException("Go online to accept deliveries");
+        const changed = await tx.order.updateMany({
+          where: { id: order.id, version: order.version, status: "ready" },
+          data: { version: { increment: 1 } },
+        });
+        if (!changed.count)
+          throw new ConflictException("This order is no longer available");
+        if (
+          await tx.deliveryAssignment.findFirst({
+            where: { orderId: order.id, isActive: true },
+          })
+        )
+          throw new ConflictException("This order was already assigned");
+        const created = await tx.deliveryAssignment.create({
+          data: {
+            orderId: order.id,
+            riderId: actor.id,
+            events: { create: { actorId: actor.id, action: "assigned" } },
+          },
+          select: assignmentSummary,
+        });
+        await this.record(
+          tx,
+          actor,
+          order.id,
+          "delivery.auto_assigned",
+          created.id,
+        );
+        return created;
+      });
+      return { ok: true, accepted: true, assignment };
+    } catch (e) {
+      // Leave no half-accepted offer behind if the order moved on.
+      await this.db.deliveryOffer.updateMany({
+        where: { id, status: "offered" },
+        data: { status: "cancelled", respondedAt: new Date() },
+      });
+      throw e;
+    }
+  }
+
   async staffAction(actor: Actor, id: string, body: unknown) {
     permit(actor.role, "delivery:dispatch");
     const { action, version } = parse(
