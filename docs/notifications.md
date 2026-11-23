@@ -49,14 +49,32 @@ server; **it has not been run against a real Firebase project.**
    `firebase_messaging` plugin. Until then the apps show the in-app inbox,
    bell and a banner while open, but a closed app is not woken.
 
+## Ratings, offers and picks
+
+* **Rating prompt.** 30 minutes to 6 hours after an order is delivered or
+  collected, customers who turned on reminders get one prompt (never twice, never
+  if already rated). Customers rate 1 to 5 stars with an optional note
+  (`POST /api/orders/:id/rating`, once per order). A rating of 3 or less alerts
+  the owner and counter. The owner sees the average, distribution and low
+  ratings (`GET /api/ratings/summary`), with a warning below 20 ratings.
+* **Owner offers** (this covers flash deals and festival or event messages). The
+  owner writes the title and message; the server sends exactly that text to
+  customers who opted in to promotions, to all customers, recent orderers or
+  lapsed ones, now or scheduled up to 30 days ahead. Limits: 3 offers a day,
+  caps and quiet hours still apply. Nothing is invented: there is no discount
+  engine, so write only offers you will honour.
+* **Picked for you.** `GET /api/me/recommendations` ranks available dishes by
+  what this customer orders (recent orders count more) plus what is popular this
+  month, each with a plain reason. It is simple counting, not a learned model.
+
 ## Not built (deliberately)
 
-Flash deals, cultural-event campaigns, post-order rating prompts, SMS/WhatsApp
-fallback, a trained uplift model and the taste-graph recommender. No discounts
-or crowd numbers are invented: copy only states things that are true.
+SMS/WhatsApp fallback, a discount or coupon engine, a trained uplift model and
+the Swiggy-style taste-graph recommender (it needs far more order data than a
+single outlet has). No discounts or crowd numbers are invented.
 
 ## Endpoints
 
 `GET /api/notifications`, `/unread-count`, `/preferences` (GET/PUT), `POST
 /read`, `POST /:id/open`, `GET /report`, `POST /test`, `POST|DELETE /api/devices`,
-`PUT /api/me/cart`.
+`PUT /api/me/cart`, `GET /api/me/offers`, `GET /api/me/recommendations`, `GET|POST /api/offers`, `POST /api/offers/:id/cancel`, `GET /api/ratings/summary`.

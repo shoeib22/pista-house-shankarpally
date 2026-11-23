@@ -2,6 +2,7 @@ import 'package:pista_ui/pista_ui.dart';
 import 'package:pista_core/pista_core.dart';
 import 'features/orders/widgets/order_actions.dart';
 import 'features/support/support_pages.dart';
+import 'features/engagement/offers_page.dart';
 import 'package:pista_tracking/pista_tracking.dart';
 
 Future<void> main() async {
@@ -204,6 +205,15 @@ class _OwnerHomeState extends State<OwnerHome> {
               );
               if (mounted && signedIn) run(refresh);
             },
+          ),
+        if (signedIn)
+          IconButton(
+            tooltip: 'Offers and ratings',
+            icon: const Icon(Icons.campaign_outlined),
+            onPressed: () => Navigator.push<void>(
+              context,
+              MaterialPageRoute(builder: (_) => OffersPage(api: api)),
+            ),
           ),
         IconButton(
           tooltip: 'Refresh',

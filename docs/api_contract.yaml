@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Pista House Shankarpally API",
-    "version": "0.11.0",
+    "version": "0.12.0",
     "description": "Single-outlet pickup, delivery and private beta API. Real menu, payments, phone authentication and service zones require launch configuration. Live GPS is scoped to active rider sharing leases; map selection does not approve a delivery zone."
   },
   "servers": [
@@ -5911,6 +5911,285 @@
                 "schema": {
                   "type": "string",
                   "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          }
+        }
+      }
+    },
+    "/orders/{id}/rating": {
+      "get": {
+        "operationId": "getOrderRating",
+        "summary": "The customer's rating for a finished order, or null",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          }
+        }
+      },
+      "post": {
+        "operationId": "rateOrder",
+        "summary": "Rate a finished order 1 to 5 stars, once",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
+      }
+    },
+    "/ratings/summary": {
+      "get": {
+        "operationId": "ratingSummary",
+        "summary": "Owner: average, distribution and low ratings",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          }
+        }
+      }
+    },
+    "/offers": {
+      "get": {
+        "operationId": "listOffers",
+        "summary": "Owner: offers and their send counts",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createOffer",
+        "summary": "Owner: write an offer to send to opted-in customers",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
+      }
+    },
+    "/offers/{id}/cancel": {
+      "post": {
+        "operationId": "cancelOffer",
+        "summary": "Owner: cancel a scheduled offer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          }
+        }
+      }
+    },
+    "/me/offers": {
+      "get": {
+        "operationId": "activeOffers",
+        "summary": "Offers the customer can see right now",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired or revoked"
+          }
+        }
+      }
+    },
+    "/me/recommendations": {
+      "get": {
+        "operationId": "recommendations",
+        "summary": "Picked for you: dishes ranked from the customer's orders and what is popular",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
                 }
               }
             }

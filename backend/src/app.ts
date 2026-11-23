@@ -35,6 +35,7 @@ import {
 } from "./accounts/email";
 import { Mailer } from "./mailer";
 import { Support, SupportController } from "./support";
+import { Engagement, EngagementController } from "./engagement";
 import {
   Notifications,
   NotificationsController,
@@ -270,6 +271,7 @@ class ProtectedController {
     PaymentsController,
     PaymentWebhookController,
     SupportController,
+    EngagementController,
     NotificationsController,
     AccountManagementController,
     TrackingController,
@@ -286,6 +288,7 @@ class ProtectedController {
     Payments,
     Notifications,
     Support,
+    Engagement,
     Dispatch,
     Accounts,
     Tracking,

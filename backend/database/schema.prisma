@@ -487,3 +487,33 @@ model SupportAttachment {
   @@index([messageId])
   @@index([createdAt])
 }
+
+model OrderRating {
+  id         String   @id @default(uuid())
+  orderId    String   @unique
+  customerId String
+  outletId   String
+  stars      Int
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  @@index([outletId, createdAt])
+}
+
+model Offer {
+  id          String    @id @default(uuid())
+  outletId    String
+  createdById String
+  title       String
+  body        String
+  productId   String?
+  audience    String    @default("all")
+  startsAt    DateTime
+  endsAt      DateTime?
+  status      String    @default("scheduled")
+  sentCount   Int       @default(0)
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([outletId, status, startsAt])
+}

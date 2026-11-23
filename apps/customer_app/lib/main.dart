@@ -3,6 +3,7 @@ import 'features/checkout/screens/checkout_sheet.dart';
 import 'features/auth/auth_page.dart';
 import 'features/auth/email_pages.dart';
 import 'features/support/support_pages.dart';
+import 'features/engagement/engagement_pages.dart';
 import 'features/account/saved_addresses_page.dart';
 import 'package:pista_ui/pista_ui.dart';
 import 'package:pista_core/pista_core.dart';
@@ -85,6 +86,20 @@ class _CustomerHomeState extends State<CustomerHome> {
           builder: (_) => SupportPage(api: model.api, orders: model.orders),
         ),
       );
+    } else if (kind == 'order.rate') {
+      final id = (n['data'] as Map?)?['orderId'];
+      final match = model.orders.where((o) => o['id'] == id);
+      if (match.isNotEmpty) {
+        Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RatePage(api: model.api, order: match.first),
+          ),
+        );
+      }
+    } else if (kind == 'offer') {
+      Navigator.maybePop(context);
+      setState(() => tab = 4);
     } else if (kind.startsWith('order') || kind.startsWith('refund')) {
       Navigator.maybePop(context);
       setState(() => tab = 2);
@@ -391,6 +406,20 @@ class _CustomerHomeState extends State<CustomerHome> {
       icon: const Icon(Icons.support_agent_outlined, size: 18),
       label: const Text('Get help with this order'),
     );
+    final done =
+        order['status'] == 'delivered' || order['status'] == 'collected';
+    final rate = TextButton.icon(
+      onPressed: model.api.token == null
+          ? null
+          : () => Navigator.push<void>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RatePage(api: model.api, order: order),
+              ),
+            ),
+      icon: const Icon(Icons.star_outline_rounded, size: 18),
+      label: const Text('Rate this order'),
+    );
     final again = OutlinedButton.icon(
       onPressed: model.busy || model.checkoutLocked
           ? null
@@ -400,7 +429,7 @@ class _CustomerHomeState extends State<CustomerHome> {
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [?existing, if (canAgain) again, help],
+      children: [?existing, if (canAgain) again, if (done) rate, help],
     );
   }
 
@@ -471,27 +500,12 @@ class _CustomerHomeState extends State<CustomerHome> {
     if (model.cart.isNotEmpty) setState(() => tab = 1);
   }
 
-  Widget _offers() => ListView(
-    padding: const EdgeInsets.all(24),
-    children: [
-      const Text(
-        'Offers',
-        style: TextStyle(fontSize: 26, fontWeight: FontWeight.w600),
-      ),
-      const SizedBox(height: 16),
-      const Text(
-        'There are no offers or coupons available right now. Prices you see on the menu are the prices you pay.',
-        style: TextStyle(height: 1.7),
-      ),
-      const SizedBox(height: 20),
-      FilledButton(
-        onPressed: () => setState(() {
-          menuCategory = 'All';
-          tab = 1;
-        }),
-        child: const Text('Browse the menu'),
-      ),
-    ],
+  Widget _offers() => ForYouTab(
+    model: model,
+    onBrowse: () => setState(() {
+      menuCategory = 'All';
+      tab = 1;
+    }),
   );
   Widget _profile() {
     const beta = bool.fromEnvironment('BETA_TESTING');
