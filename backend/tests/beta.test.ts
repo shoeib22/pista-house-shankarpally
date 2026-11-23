@@ -50,6 +50,8 @@ before(async () => {
   validateRuntime(env);
   assert.equal(new URL(env.DATABASE_URL).pathname, "/pista_beta");
   Object.assign(process.env, env);
+  process.env.DATABASE_URL =
+    process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
   app = await NestFactory.create(AppModule, { logger: false });
   app.use((req: any, _res: any, next: () => void) => {
     Object.defineProperty(req, "ip", { value: ip, configurable: true });

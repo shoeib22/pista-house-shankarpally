@@ -40,6 +40,8 @@ before(async () => {
   const env = dotenv.parse(await fs.readFile(".env.beta"));
   validateRuntime(env);
   Object.assign(process.env, env);
+  process.env.DATABASE_URL =
+    process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
   for (const f of [
     "NOTIFICATIONS_POLL_DISABLED",
     "NOTIFICATIONS_CAMPAIGNS_DISABLED",
@@ -293,8 +295,7 @@ test("old photos are deleted after the retention period, the messages stay", asy
     await db.supportAttachment.count({ where: { ticketId: t.id } }),
     0,
   );
-  const view = (await call("GET", `/api/support/tickets/${t.id}`, "bob"))
-    .json;
+  const view = (await call("GET", `/api/support/tickets/${t.id}`, "bob")).json;
   assert.equal(view.messages.length, 1);
   assert.deepEqual(view.messages[0].attachments, []);
 });

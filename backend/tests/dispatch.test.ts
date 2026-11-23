@@ -28,6 +28,8 @@ before(async () => {
   const env = dotenv.parse(await fs.readFile(".env.beta"));
   validateRuntime(env);
   Object.assign(process.env, env);
+  process.env.DATABASE_URL =
+    process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
   process.env.DISPATCH_DISABLED = "true"; // tests drive the cycle by hand
   app = await NestFactory.create(AppModule, { logger: false });
   await app.listen(0, "127.0.0.1");

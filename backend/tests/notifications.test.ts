@@ -34,6 +34,8 @@ before(async () => {
   const env = dotenv.parse(await fs.readFile(".env.beta"));
   validateRuntime(env);
   Object.assign(process.env, env);
+  process.env.DATABASE_URL =
+    process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
   for (const f of [
     "NOTIFICATIONS_POLL_DISABLED",
     "NOTIFICATIONS_CAMPAIGNS_DISABLED",
@@ -150,6 +152,21 @@ const mine = (who: string) =>
     where: { userId: users[who].id },
     orderBy: { createdAt: "asc" },
   });
+/**
+ * Polls and returns how many alerts were made for THIS file's users. The poll
+ * itself is global, so other test files running at the same time against the
+ * same database can add alerts for their own users; those must not be counted.
+ */
+async function polled() {
+  const ids = Object.values(users).map((u: any) => u.id);
+  const before = await db.notification.count({
+    where: { userId: { in: ids } },
+  });
+  await n.pollEvents();
+  return (
+    (await db.notification.count({ where: { userId: { in: ids } } })) - before
+  );
+}
 const kinds = async (who: string) => (await mine(who)).map((x) => x.kind);
 async function register(who: string) {
   const r = await call("POST", "/api/devices", who, {
@@ -332,7 +349,7 @@ test("order updates reach the customer and the outlet staff, in time order, once
   await later();
   await event(o.id, "ready");
   assert.equal(
-    await n.pollEvents(),
+    await polled(),
     4 + 3,
     "four for the customer, new-order alerts for owner, counter and kitchen",
   );
@@ -361,7 +378,7 @@ test("order updates reach the customer and the outlet staff, in time order, once
   );
   assert.equal(memoryPush.sent[0].message.priority, "p0");
   assert.equal(memoryPush.sent[0].message.data.route, "order");
-  assert.equal(await n.pollEvents(), 0, "polling again makes nothing new");
+  assert.equal(await polled(), 0, "polling again makes nothing new");
   await event(o.id, "reject", "Out of stock");
   await n.pollEvents();
   assert.match(
@@ -381,7 +398,7 @@ test("history is never replayed as alerts", async () => {
       createdAt: new Date(Date.now() - 60000),
     },
   });
-  assert.equal(await n.pollEvents(), 0);
+  assert.equal(await polled(), 0);
   assert.equal((await mine("alice")).length, 0);
 });
 

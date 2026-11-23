@@ -35,6 +35,8 @@ before(async () => {
   const env = dotenv.parse(await fs.readFile(".env.beta"));
   validateRuntime(env);
   Object.assign(process.env, env);
+  process.env.DATABASE_URL =
+    process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
   process.env.DEFAULT_OUTLET_ID = outlet;
   process.env.MAIL_PROVIDER = "memory";
   process.env.MAIL_DAILY_LIMIT = "1000";

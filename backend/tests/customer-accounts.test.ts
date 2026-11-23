@@ -34,6 +34,8 @@ before(async () => {
   const env = dotenv.parse(await fs.readFile(".env.beta"));
   validateRuntime(env);
   Object.assign(process.env, env);
+  process.env.DATABASE_URL =
+    process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
   process.env.DEFAULT_OUTLET_ID = outlet;
   delete process.env.CUSTOMER_REGISTRATION;
   app = await NestFactory.create(AppModule, { logger: false });
