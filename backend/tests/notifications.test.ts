@@ -582,7 +582,10 @@ test("reminders and offers need an opt-in, are capped per day, and wait out quie
     promotions: true,
   });
   await register("alice");
-  const night = new Date("2026-11-23T17:30:00Z");
+  // Always the next 23:00 IST, so the 08:00 IST release is still in the future.
+  const night = new Date();
+  night.setUTCHours(17, 30, 0, 0);
+  if (night.getTime() <= Date.now()) night.setUTCDate(night.getUTCDate() + 1);
   const r = await n.notify(
     {
       userId: users.alice.id,
